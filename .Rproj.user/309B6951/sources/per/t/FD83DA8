@@ -1,0 +1,26 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1595886291408.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "2080426571",
+    "id" : "FD83DA8",
+    "lastKnownWriteTime" : 1595902077,
+    "last_content_update" : 1595902077881,
+    "path" : "C:/Users/tomas/OneDrive/Escritorio/ProyectosR/exer/PracticaInvestigacion/R/EjemploRegresionLinealSimple.R",
+    "project_path" : "R/EjemploRegresionLinealSimple.R",
+    "properties" : {
+        "cursorPosition" : "83,24",
+        "scrollLine" : "75",
+        "tempName" : "Untitled1"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}
