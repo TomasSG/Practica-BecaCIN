@@ -7,6 +7,7 @@ library(dplyr, warn.conflicts = FALSE)
 library(gridExtra, warn.conflicts = FALSE)
 library(MASS, warn.conflicts = FALSE)
 library(lmtest, warn.conflicts = FALSE)
+library(car, warn.conflicts = FALSE)
 data("Cars93")
 
 # --------------------------------------Análisis de correlación lineal------------------------------------ 
@@ -224,3 +225,51 @@ ggplot(resultados, aes(seq_along(residuos), residuos, color = residuos)) +
   scale_color_gradient2(low = "darkblue", mid = "gray", high = "firebrick") 
 
   # No se visualiza ninguna tendencia en particular
+
+  # Por último, identificación de valores atípicos.
+
+resultados <- data.frame(resultados, "s_residuos" = rstudent(modelo))
+
+ggplot(resultados, aes(predicciones, abs(s_residuos))) +
+  geom_point(aes(color = ifelse(abs(s_residuos) > 3, "firebrick", "black"))) +
+  geom_hline(yintercept = 3, color = "black", linetype = "dashed") +
+  theme_gdocs() +
+  scale_color_identity() +
+  ylab("Residuos studentized (valor absoluto)") +
+  xlab("Predicciones") +
+  ggtitle("Búsqueda de outliers") +
+  theme(plot.title = element_text(hjust = .5, size = 15, color = "black"))
+
+index_outliers <- which(abs(resultados$s_residuos) > 3)
+
+summary(influence.measures(modelo))
+
+influencePlot(modelo)
+
+  # En principio, detectamos las muestras 57 y 89 como outliers pero no son influyentes. Las muestras que si
+  # resultan influyenetes son la 39 y 19, así que recalculamos la recta de regresión exluyendo estas dos
+  # muestras para comparar el resultado
+
+ggplot(Cars93, aes(Log_horsepower, Weight)) +
+  geom_point(color = "grey") +
+  geom_smooth(method = "lm", se = FALSE, color = "firebrick") +
+  geom_point(data = Cars93[c(39, 19),], color = "black", size = 2) +
+  geom_smooth(data = Cars93[-c(39, 19),], method = "lm", se = FALSE, color = "darkblue") +
+  theme_gdocs() +
+  ggtitle("Weigth ~ log10(Horsepower)") +
+  xlab("log10(Horsepower)") +
+  theme(plot.title = element_text(hjust = .5, color = "black"),
+        axis.title.x = element_text(color = "black"),
+        axis.title.y = element_text(color = "black"))
+  
+  # Ahora vemos como cambia los resultados con esa exclusión
+
+lm(Weight ~ Log_horsepower, Cars93[-c(39, 19),])$coefficients
+modelo$coefficients
+
+  # Como vemos, no cambia demasiado los valores del a recta, lo que nos da la pauta de que no son
+  # valores influyentes
+
+# Conlusiones: no se cumple la condición de normalidad de los residuos, y el test para verificar 
+# homocedasticidad arroga un pvalor al límite. El R2 tampoco es muy alto, con lo que se concluye que
+# el modelo no es muy bueno.
