@@ -93,4 +93,30 @@ cor.test(Cars93$Weight, Cars93$Log_horsepower, method = "pearson", alternative =
 
 # Como obtenemos un pvalor < 2.2e-16 significa que es significativo el coeficiente de correlación calculado.
 
+# --------------------------------------Regresión lineal simple------------------------------------ 
+
+# El modelo generado va a buscar cuantificar la relación entre Weight y log10(Horsepower).
+
+# 1) El primer paso es representar los datos para intuir si existe una relación y cuantificar la relación 
+# me diante un coeficiente de relación. Resumiendo los resultados de la sección anterior
+
+ggplot(Cars93, aes(Log_horsepower, Weight)) +
+  geom_point(color = "darkblue") +
+  theme_gdocs() +
+  ggtitle("Diagrama de dispersión") +
+  xlab( "Log10(Horsepower)") +
+  theme(plot.title = element_text(hjust = .5, color = "black"))
+
+cor.test(Cars93$Log_horsepower, Cars93$Weight)
+
+# 2) Calculo del modelo de regresión lineal simple
+
+modelo <- lm(Weight ~ Log_horsepower, Cars93)
+
+summary(modelo)  
+
+
+
+
+
 
