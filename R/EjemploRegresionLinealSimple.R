@@ -6,6 +6,7 @@ library(GGally, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(gridExtra, warn.conflicts = FALSE)
 library(MASS, warn.conflicts = FALSE)
+library(lmtest, warn.conflicts = FALSE)
 data("Cars93")
 
 # --------------------------------------Análisis de correlación lineal------------------------------------ 
@@ -164,9 +165,7 @@ ggplot(resultados, aes(predicciones, residuos, color = residuos)) +
 
   # Luego, distribución normal de reisduos
 
-cant_bins <- function(x){
-  return(1 + 3.322 * log10(x))
-}
+cant_bins <- function(x) return(1 + 3.322 * log10(x))
 
 ggplot(resultados, aes(residuos, ..density..)) +
   geom_histogram(bins = cant_bins(nrow(resultados)), fill = "white", color = "firebrick", ) +
@@ -189,3 +188,39 @@ shapiro.test(resultados$residuos)
   # los residuos no son normales (pvalor = .00834 < .05) 
 
   # Varianza constante de los residuos (homocedasticidad)
+
+
+ggplot(resultados, aes(predicciones, residuos, color = residuos)) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  geom_segment(aes(x = predicciones, y = 0, xend = predicciones, yend = residuos), color = "black", alpha = 0.3) +
+  geom_smooth(se = FALSE, color = "darkred") +
+  theme_clean() +
+  ylab("Residuos") +
+  xlab("Predicciones") +
+  ggtitle("Análisis de la homocedasticidad de los residuos") +
+  theme(plot.title = element_text(hjust = .5, size = 20),
+        axis.title = element_text(size = 15),
+        legend.position = "none") +
+  scale_color_gradient2(low = "darkblue", mid = "gray", high = "firebrick")
+
+bptest(modelo)
+
+  # Por el test pareciera que no hay indicaciones de falta de homocedasticidad
+
+  # Autocorrelación de residuos, es decir que sean independientes. Para hacerlo se buscan patrones
+
+ggplot(resultados, aes(seq_along(residuos), residuos, color = residuos)) +
+  geom_point() +
+  geom_line(size = .3) +
+  geom_hline(yintercept = 0) +
+  theme_clean() +
+  ylab("Residuos") +
+  xlab("Índice") +
+  ggtitle("Análisis de la independencia") +
+  theme(plot.title = element_text(hjust = .5, size = 20),
+        axis.title = element_text(size = 15),
+        legend.position = "none") +
+  scale_color_gradient2(low = "darkblue", mid = "gray", high = "firebrick") 
+
+  # No se visualiza ninguna tendencia en particular
