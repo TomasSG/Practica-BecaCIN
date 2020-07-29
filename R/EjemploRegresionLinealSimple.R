@@ -115,8 +115,77 @@ modelo <- lm(Weight ~ Log_horsepower, Cars93)
 
 summary(modelo)  
 
+# Del resumen interpretamos:
+# 1. R2 = 0.6556, quiere decir que el modelo explica el 65.56% de la variación total en los pesos observados
+# 2. B1 = 3075.7, quiere decir que el incremento estimado para el peso promedio por cada aumento de una unidad
+# del logaritmo de la potencia es de 3075.7 (NOTA: no pongo unidades porque las desconosco).
+# 3. los pvalor de B1 y B0, quiere decir que los parámetros son significativamente distintos de cero. Para el B1 es
+# más interesante porque se interpreta como existe una relación lineal entre la variable predictora y respuesta.
+
+# 3) IC para B0 y B1
+
+confint(modelo)
+
+# 4) Represetnación gráfica del modelo
+
+ggplot(Cars93, aes(Log_horsepower, Weight)) +
+  geom_point(color = "darkblue") +
+  geom_smooth(method = "lm", color = "firebrick") +
+  theme_gdocs() +
+  ggtitle("Weigth ~ log10(Horsepower)") +
+  xlab("log10(Horsepower)") +
+  theme(plot.title = element_text(hjust = .5, color = "black"),
+        axis.title.x = element_text(color = "black"),
+        axis.title.y = element_text(color = "black"))
 
 
 
+# 5) Verificar las condiciones para aceptar un modelo lineal
+  
+  # Primero se evalua la relación lineal entre variable predictora y respuesta. Se representa con un
+  # scatterplot los residuos, que se deben distribuir en torno al valor 0
 
+resultados <- data.frame("predicciones" =  modelo$fitted.values, "residuos" = modelo$residuals)
 
+ggplot(resultados, aes(predicciones, residuos, color = residuos)) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  geom_segment(aes(x = predicciones, y = 0, xend = predicciones, yend = residuos), color = "black", alpha = 0.3) +
+  theme_clean() +
+  ylab("Residuos") +
+  xlab("Predicciones") +
+  ggtitle("Análisis de la media de los residuos") +
+  theme(plot.title = element_text(hjust = .5, size = 20),
+        axis.title = element_text(size = 15),
+        legend.position = "none") +
+  scale_color_gradient2(low = "darkblue", mid = "gray", high = "firebrick")
+
+  # Parecieria que los residuos se distribuyen entorno al cero por lo que se acepta la linealidad
+
+  # Luego, distribución normal de reisduos
+
+cant_bins <- function(x){
+  return(1 + 3.322 * log10(x))
+}
+
+ggplot(resultados, aes(residuos, ..density..)) +
+  geom_histogram(bins = cant_bins(nrow(resultados)), fill = "white", color = "firebrick", ) +
+  theme_few() +
+  ylab("") +
+  xlab("Residuos") +
+  ggtitle("Histograma (análisis normalidad residuos)") +
+  theme(plot.title = element_text(hjust = .5, color = "black", size = 20))
+
+ggplot(resultados, aes(sample = residuos)) +
+  geom_qq_line() +
+  geom_qq(color = "firebrick") +
+  theme_few() +
+  ggtitle("QQplot (análisis normalidad residuos)") +
+  theme(plot.title = element_text(hjust = .5, color = "black", size = 20))
+
+shapiro.test(resultados$residuos)
+  
+  # Si bien por el histograma parece ser que hay cierta normalidad, por el qqplot y el shapiro test obtenemos que
+  # los residuos no son normales (pvalor = .00834 < .05) 
+
+  # Varianza constante de los residuos (homocedasticidad)
