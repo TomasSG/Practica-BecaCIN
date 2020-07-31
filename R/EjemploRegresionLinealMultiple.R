@@ -21,7 +21,10 @@ datos <- rename(habitantes = Population, analfabetismo = Illiteracy,
 # El objetivo del modelo a hacer es predecir valores para la esperanza de vida media en función
 # de distintas variables.
 
-# Paso 1: Análisis de la relación entre variables
+# +-------------------------------------------------+
+# | PASO 1: Análisis de la relación entre variables |
+# +-------------------------------------------------+
+
 
 ggpairs(datos, 
         low = list(continuous = wrap("smooth", alpha = .6)), axisLabels = "none",
@@ -48,18 +51,22 @@ ggpairs(datos,
 #   Asesinatos
 # En cuanto a las distribuciones pareciera que habitatnes y area tienen una distribución exponencial 
 
-# Paso 2: generar el modelo. Iniciamos con un modelo con todas las variables y 
-# lo vamos a ir reduciendo.
+# +---------------------------+
+# | PASO 2: Generar un modelo |
+# +---------------------------+
+# Iniciamos con un modelo con todas las variables y lo vamos a ir reduciendo.
 
 modelo <- lm(esp_vida ~ habitantes + ingresos + analfabetismo + asesinatos + universitarios + 
                heladas + area, datos)
 summary(modelo)
 
-# El R2 ajustado esd e .692, lo que es alto. El p-valor del modelo es sifnificativo por lo que 
+# El R2 ajustado es de .692, lo que es alto. El p-valor del modelo es sifnificativo por lo que 
 # se puede aceptar. Además, tenemos 3 B1 que son significativos pero hay que decidir que
 # hacer con el resto
 
-# Paso 3: selección de los mejores predictores
+# +----------------------------------------------+
+# | PASO 2: Selección de los mejores predictores |
+# +----------------------------------------------+
 # Realizamos un stepwise en mixto para la elección
 
 step(modelo, trace = 1)
@@ -75,8 +82,43 @@ summary(modelo)
 # -0.3001 por cada incremento de una unidad de los asesinatos, manteniendo el resto de 
 # variables constantes.
 
+# +---------------------------------+
+# | PASO 4: Validación de supuestos |
+# +---------------------------------+
+
+# A) Relación lineal entre predictores y respuesta
+# Graficamos los residuos contra los predictores
+
+datos <- data.frame(datos, "residuos" = modelo$residuals)
 
 
+formato_titulo <- function(string) {
+  string <- tolower(string)
+  substr(string, 1, 1) <- toupper(substr(string, 1, 1))
+  return(string)
+}
+
+scatterplot_residuos <- function(nombre_var){
+  
+  ggplot(datos, aes_string(tolower(nombre_var), "residuos")) +
+    geom_point() +
+    geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+    geom_smooth(color = "firebrick") +
+    theme_gdocs() +
+    ylab("Residuos") +
+    xlab(formato_titulo(nombre_var)) +
+    ggtitle(paste("Relación lineal con", formato_titulo(nombre_var))) +
+    theme(plot.title = element_text(hjust = 0.5, size = 20, color = "black"),
+          axis.title = element_text(size = 15, color = "black"),
+          text = element_text(family = "Bookman Old Style"))
+}
+
+g1 <- scatterplot_residuos("habitantes")
+g2 <- scatterplot_residuos("asesinatos")
+g3 <- scatterplot_residuos("universitarios")
+g4 <- scatterplot_residuos("heladas")
+
+grid.arrange(g1, g2, g3, g4, nrow = 2)
 
 
 
