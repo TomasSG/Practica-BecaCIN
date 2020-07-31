@@ -178,11 +178,11 @@ vif(modelo)
 
 # Por los resultados del VIF no pareciera existir multicolinialidad
 
-# E) No autocorrelación
+# E) Autocorrelación
 
 dwt(modelo, alternative = "two.sided")
 
-# Por el test se cree que los valores no están autocorrelacionados
+# Por el test se cree que las muestras son independientes
 
 # F) Identificación de los posibles valores atípicos o influyentes
 
@@ -204,5 +204,25 @@ ggplot(datos, aes(valores_ajustados, abs(s_residuos))) +
 # No se encontrno outliers
 # Ahora buscamos valores influyentes
 
-View(summary(influence.measures(modelo)))
+aux <- data.frame(summary(influence.measures(modelo)))
+
+# Se considera un valor influyente a aquellos hat que superen
+#   umbral = 2.5 * (p + 1) / n
+# con  p = número de predictores y n = cantidad de muestras
+
+umbral_hat <- 2.5 * length(modelo$coefficients)  / nrow(datos)
+
+aux %>% 
+    filter(hat > umbral_hat)
   
+# Con este análisis tenemos que las muestras de California y Nevada parecen ser influyentes.
+# Calculamos el modelo excluynedolas
+
+indices <- which.names(c("California", "Nevada"), datos)
+modelo_aux <- lm(esp_vida ~ habitantes + asesinatos + universitarios + 
+     heladas , datos[-indices,])
+
+summary(modelo_aux)
+summary(modelo)
+
+# Como vemos no se mejora la modelo con la exlcusión de estos datos.
