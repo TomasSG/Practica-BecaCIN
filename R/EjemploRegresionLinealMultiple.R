@@ -6,6 +6,9 @@ library(GGally, warn.conflicts = FALSE)
 library(dplyr, warn.conflicts = FALSE)
 library(gridExtra, warn.conflicts = FALSE)
 library(extrafont, warn.conflicts = FALSE)
+library(corrplot, warn.conflicts = FALSE)
+library(ggcorrplot, warn.conflicts = FALSE)
+library(car, warn.conflicts = FALSE)
 
 # font_import()
 
@@ -65,7 +68,7 @@ summary(modelo)
 # hacer con el resto
 
 # +----------------------------------------------+
-# | PASO 2: Selección de los mejores predictores |
+# | PASO 3: Selección de los mejores predictores |
 # +----------------------------------------------+
 # Realizamos un stepwise en mixto para la elección
 
@@ -98,12 +101,12 @@ formato_titulo <- function(string) {
   return(string)
 }
 
-scatterplot_residuos <- function(nombre_var){
+scatterplot_residuos <- function(nombre_var, is_ic = TRUE){
   
   ggplot(datos, aes_string(tolower(nombre_var), "residuos")) +
     geom_point() +
     geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
-    geom_smooth(color = "firebrick") +
+    geom_smooth(color = "firebrick", se = is_ic) +
     theme_gdocs() +
     ylab("Residuos") +
     xlab(formato_titulo(nombre_var)) +
@@ -120,7 +123,86 @@ g4 <- scatterplot_residuos("heladas")
 
 grid.arrange(g1, g2, g3, g4, nrow = 2)
 
+# Por los gráficos pareciera que se distribuyen alrededor del cero los residuos.
 
+# B) Distribución normal de residuos
 
+ggplot(datos, aes(sample = residuos)) +
+  geom_qq(color = "darkblue") +
+  geom_qq_line() +
+  theme_minimal() +
+  xlab("Theoretical") +
+  ylab("Sample") +
+  ggtitle("QQplot residuos") +
+  theme(plot.title = element_text(hjust = .5, size = 20),
+        axis.title = element_text(size = 15), 
+        text = element_text(family = "Rockwell"))
+  
+calcular_bins <- function(n) 1 + 3.33 * log10(n)
 
+ggplot(datos, aes(residuos)) +
+  geom_histogram(bins = calcular_bins(nrow(datos)), fill = "white", color = "firebrick") +
+  theme_gdocs() +
+  xlab("Residuos") +
+  ylab("") +
+  ggtitle("Histograma de residuos") +
+  theme(plot.title = element_text(hjust = .5, color = "black", size = 20),
+        axis.title = element_text(size = 15),
+        text = element_text(family = "Poor Richard"))
 
+shapiro.test(datos$residuos)
+
+# En base al análisis gráfico y el test podemos se cree que los residuos tienen una distribución normal
+
+# C) Homocedasticidad
+
+datos <- data.frame(datos, "valores_ajustados" = modelo$fitted.values)
+
+scatterplot_residuos("valores_ajustados", is_ic = FALSE)
+
+# No pareciera que exista algún patrón en la distribución de los residuos
+
+# D) No colinialidad o multicolinialidad
+
+ggcorrplot(cor(datos[, c("habitantes", "asesinatos", "universitarios", "heladas")], method = "pearson"),
+           ggtheme = theme_bw,
+           hc.order = TRUE,
+           lab = TRUE, 
+           lab_size = 6,
+           type = "lower",
+           colors = c("#ff0084", "#ededed", "#e73827"))
+
+# No pareciera exisitr colinealidad, aunque el R entre asesinatos y heladas es de 0.54.
+
+vif(modelo)
+
+# Por los resultados del VIF no pareciera existir multicolinialidad
+
+# E) No autocorrelación
+
+dwt(modelo, alternative = "two.sided")
+
+# Por el test se cree que los valores no están autocorrelacionados
+
+# F) Identificación de los posibles valores atípicos o influyentes
+
+# Primero empeazamos por los atípicos
+
+datos <- data.frame(datos, "s_residuos" = rstudent(modelo))
+
+ggplot(datos, aes(valores_ajustados, abs(s_residuos))) +
+  geom_point(size = 1.5) +
+  geom_point(data = datos[abs(datos$s_residuos) > 3,], color = "firebrick") +
+  geom_hline(yintercept = 3, linetype = "dashed") +
+  theme_gdocs() +
+  ylab("Residuos studintized") +
+  xlab("Valores ajustados") +
+  ggtitle("Análisis de outliers") +
+  theme(plot.title = element_text(color = "black", hjust = .5),
+        text = element_text(family = "Tw Cen MT"))
+
+# No se encontrno outliers
+# Ahora buscamos valores influyentes
+
+View(summary(influence.measures(modelo)))
+  
