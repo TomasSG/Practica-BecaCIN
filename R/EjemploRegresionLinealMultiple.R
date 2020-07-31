@@ -223,6 +223,6 @@ modelo_aux <- lm(esp_vida ~ habitantes + asesinatos + universitarios +
      heladas , datos[-indices,])
 
 summary(modelo_aux)
-summary(modelo)
+summary(modelo)$coefficients
 
 # Como vemos no se mejora la modelo con la exlcusión de estos datos.
