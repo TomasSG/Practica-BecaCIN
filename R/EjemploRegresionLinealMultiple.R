@@ -1,5 +1,5 @@
 # --------------------------------------Bibliotecas------------------------------------
-
+{
 library(ggplot2, warn.conflicts = FALSE)
 library(ggthemes, warn.conflicts = FALSE)
 library(GGally, warn.conflicts = FALSE)
@@ -9,7 +9,7 @@ library(extrafont, warn.conflicts = FALSE)
 library(corrplot, warn.conflicts = FALSE)
 library(ggcorrplot, warn.conflicts = FALSE)
 library(car, warn.conflicts = FALSE)
-
+}
 # font_import()
 
 
@@ -83,7 +83,9 @@ summary(modelo)
 # media de esperanza de vida.
 # Interpretamos un B1: el incremento estimado de la esperanza de vida promedio es de 
 # -0.3001 por cada incremento de una unidad de los asesinatos, manteniendo el resto de 
-# variables constantes.
+# variables constantes. 
+# Por cada unidad que incrementa los asesinatos, disminuye en -0.30011 la esperanza 
+# media de vida. 
 
 # +---------------------------------+
 # | PASO 4: Validación de supuestos |
@@ -106,7 +108,7 @@ scatterplot_residuos <- function(nombre_var, is_ic = TRUE){
   ggplot(datos, aes_string(tolower(nombre_var), "residuos")) +
     geom_point() +
     geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
-    geom_smooth(color = "firebrick", se = is_ic) +
+    #geom_smooth(color = "firebrick", se = is_ic) +
     theme_gdocs() +
     ylab("Residuos") +
     xlab(formato_titulo(nombre_var)) +
@@ -223,6 +225,6 @@ modelo_aux <- lm(esp_vida ~ habitantes + asesinatos + universitarios +
      heladas , datos[-indices,])
 
 summary(modelo_aux)
-summary(modelo)$coefficients
+summary(modelo)
 
 # Como vemos no se mejora la modelo con la exlcusión de estos datos.
