@@ -6,92 +6,53 @@ library(ggthemes)
 library(stringr)
 library(dplyr)
 library(lubridate)
+library(scales)
+library(extrafont)
+
+# --------------------------------------Temas------------------------------------
+
+tema_viejo <- theme_get()
+theme_set(theme_gdocs() + theme(text = element_text(family = "Rockwell"),
+                                plot.title = element_text(hjust = .5,size = 25, color = "black"),
+                                axis.title = element_text(size = 15, color = "black")))
 
 # --------------------------------------Carga de datos------------------------------------
 
-datos <- read.csv("./data/datasets_376751_731448_london_merged.csv")
+# Link a la info de este dataset: https://www.kaggle.com/c/titanic/data?select=train.csv
 
-# Sacamos los espacios 
+datos <- read.csv("./data/train.csv")
 
+# Cambiamos los nombres de las variables a minúsculas
+names(datos) <- c("passenger_id", "survived", "p_class", "name",
+                  "sex", "age", "sib_sp", "parch", "ticket",
+                  "fare", "cabin", "embarked")
 
 # Cambiamos algunas variables a factores 
-datos$is_weekend <- as.factor(datos$is_weekend)
+datos$p_class <- as.factor(datos$p_class)
 
-datos$is_holiday <- as.factor(datos$is_holiday)
+# Creamos un indicador de primera clase
+datos <- datos %>% mutate(es_primera = ifelse(p_class == 1, 1, 0))
+datos$es_primera <- as.factor(datos$es_primera)
 
-datos$season <- as.factor(datos$season)
+# --------------------------------------Exploración de datos------------------------------------
 
-# Indicador de que el día esta lindo (los códigos menores a 5 representan eso)
-datos <- datos %>% mutate(esta_lindo = weather_code < 5)
-
-# Obtenemos el día de semana a partir de la fecha
-datos$dia <- wday(as.Date(datos$timestamp), label = TRUE)
-datos$dia <- factor(datos$dia,
-                    levels = c("lun\\.", "mar\\.", "mié\\.",
-                    "jue\\.", "vie\\.", "sáb\\.", "dom\\."),
-                    labels = c("Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"))
-
-
-# Obtenemos la hora 
-datos <- datos %>% mutate(hora = hour(as_datetime(datos$timestamp)))
-
-# Tomamos las horas pico son 6 a 10 y 17 a 21
-datos <- datos %>% mutate(es_pico = ((hora >= 6 & hora <= 10) | (hora >= 17 & hora <= 21)))
-
-# --------------------------------------Exploración datos------------------------------------
-
-ggplot(datos, aes(is_weekend, y = ..count.. / sum(..count..), fill = is_weekend)) +
-  geom_bar() +
-  theme_gdocs()
-
-ggplot(datos, aes(is_weekend, cnt, color = is_weekend)) +
+g1 <- ggplot(datos, aes(p_class, fare, color = p_class)) +
   geom_boxplot() +
-  theme_gdocs()
+  geom_jitter(width = .1) 
 
-ggplot(datos, aes(cnt, is_weekend,color = is_weekend)) +
-  geom_point() +
-  theme_gdocs()
+g1 + coord_cartesian(ylim = c(0, 100))
 
-ggplot(datos, aes(cnt, esta_lindo ,color = esta_lindo)) +
-  geom_point() +
-  theme_gdocs()
+# Es razonable que las tarifas sean distintas según la clase en que se viaje
 
-ggplot(datos, aes(esta_lindo, cnt, color = esta_lindo)) +
+ggplot(datos, aes(es_primera, fare, color = es_primera)) +
   geom_boxplot() +
-  theme_gdocs() +
-  coord_cartesian(ylim = c(0, 2000))
+  geom_jitter(width = .1)
 
-ggplot(datos, aes(cnt, is_holiday,color = is_holiday)) +
-  geom_point() +
-  theme_gdocs()
-
-ggplot(datos, aes(is_holiday, cnt, color = is_holiday)) +
-  geom_boxplot() +
-  geom_jitter(width = .1) +
-  theme_gdocs()
-
-ggplot(datos, aes(dia, y = ..count.. / sum(..count..))) +
-  geom_bar() +
-  theme_gdocs() +
-  facet_grid(. ~ is_holiday)
-
-
-ggplot(datos, aes(season, y = ..count.. / sum(..count..))) +
-  geom_bar() +
-  theme_gdocs()
-
-ggplot(datos, aes(season, cnt, color = season)) +
-  geom_boxplot() +
-  theme_gdocs()
-
-ggplot(datos, aes(es_pico, cnt, color = es_pico)) +
-  geom_boxplot()
-
-
-ggplot(datos, aes(cnt, es_pico, color = es_pico)) +
+ggplot(datos, aes(es_primera, fare, color = es_primera)) +
   geom_point()
 
-
+# Hacemos una regresión logística para tratar de predecir si el ticket es de priemra clase o no según
+# su precio
 
 # --------------------------------------Regresión logística simple------------------------------------
 
@@ -100,49 +61,116 @@ ggplot(datos, aes(cnt, es_pico, color = es_pico)) +
 # | PASO 1: Representación de datos |
 # +---------------------------------+
 
-g1 <- ggplot(datos, aes(esta_lindo, cnt, color = esta_lindo)) +
-  geom_boxplot() +
-  theme_gdocs() 
+g1 <- ggplot(datos, aes(es_primera, fare, color = es_primera)) +
+  geom_boxplot(show.legend = FALSE) +
+  ylab("Tarifa") +
+  xlab("") +
+  ggtitle("") +
+  scale_y_continuous(labels = label_number(prefix = "$"))
 
-# Hacemos un zoom para pareciar las diferencias
-g1 + coord_cartesian(ylim = c(0, 2000))
+g2 <- ggplot(datos, aes(fare, es_primera, color = es_primera)) +
+  geom_point(alpha = .4, show.legend = FALSE) +
+  xlab("Tarifa") +
+  ylab("") +
+  ggtitle("") +
+  scale_x_continuous(labels = label_number(prefix = "$"))
 
-# Parece que existe una diferencia en la cantidad de bicis prestadas según si el día esta lindo
+annotate_figure(ggarrange(g1, g2, nrow = 1, ncol = 2),
+                top = text_grob("Tarifa contra indicador de primera clase (sin zoom)",
+                                size = TAMANIO_LETRA_TITULO_PRINCIPAL, color = "black", family = FAMILIA_LETRA))
+
+g1 <- g1 + coord_cartesian(ylim = c(0, 200))
+g2 <- g2 + coord_cartesian(xlim = c(0, 200))
+
+annotate_figure(ggarrange(g1, g2, nrow = 1, ncol = 2),
+                top = text_grob("Tarifa contra indicador de primera clase (con zoom)",
+                                size = TAMANIO_LETRA_TITULO_PRINCIPAL, 
+                                color = "black", family = FAMILIA_LETRA))
 
 
 # +----------------------------------+
 # | PASO 2: Generar el modelo de RLS |
 # +----------------------------------+
 
-modelo <- glm(esta_lindo ~ cnt, data =  datos, family = "binomial")
+modelo <- glm(es_primera ~ fare, data =  datos, family = "binomial")
 summary(modelo)
 
-# INTERPRETACIÓN: Por cada unidad que se incementa la cantidad de bicis alquiladas, los odds de que sea
-# un día lindo aumentan en promedio 1.00061.
+# INTERPRETACIÓN: Por cada unidad que se incementa la tarifa, los odds de que sea
+# un ticket de primera clase aumentan en promedio 1.0089991.
 
 # +----------------------------+
 # | PASO 3: Gráfico del modelo |
 # +----------------------------+
 
 # Primero generamos nuevos puntos
-nuevos_puntos <- seq(min(datos$cnt), max(datos$cnt), 1)
+nuevos_puntos <- seq(min(datos$fare), max(datos$fare), .5)
 
 # Ahora, predecimos las probabilidades
-predicciones <- predict(modelo, data.frame("cnt" = nuevos_puntos), type = "response")
+predicciones <- predict(modelo, data.frame(fare = nuevos_puntos), type = "response")
 
 # Graficamos las probabilidades
-df_aux <- data.frame(predicciones = predicciones, cnt = nuevos_puntos)
+df_aux <- data.frame(predicciones = predicciones, fare = nuevos_puntos)
 
-ggplot(df_aux, aes(cnt, predicciones)) +
-  geom_line() +
-  theme_gdocs()
-
-# Por qué empieza en 0.8?
+ggplot(df_aux, aes(fare, predicciones)) +
+  geom_line(color = "darkblue") +
+  xlab("Tarifa") +
+  ylab("P(Y = 1|X)") +
+  ggtitle("Predicciones realizadas") +
+  scale_x_continuous(label = label_number(prefix = "$")) +
+  coord_cartesian(xlim = c(0, 150))
 
 # +-------------------------------+
-# | PASO 3: Validación del modelo |
+# | PASO 4: Validación del modelo |
 # +-------------------------------+
 
 anova(modelo, test = "Chisq")
 
+# Por el resultado del test el modelo se considera significativo muestra una mejora
+# en las explicaciones que el modelo nullo
+
+# +---------------------------------------------------------------+
+# | PASO 5: Comparación de clasificación predicha y observaciones |
+# +---------------------------------------------------------------+
+
+# Primero realizamos las predicciones con los datos
+predicciones <- ifelse(modelo$fitted.values > 0.5, 1, 0)
+
+# Armamos un df para ver si es capaz de clasificar correctamente
+df <- data.frame(fare = modelo$model$fare, es_primera = modelo$model$es_primera,
+                 predicciones = predicciones)
+df <- df %>% mutate(prediccion_correcta = ifelse(predicciones == es_primera,
+                                                 "Correcto",
+                                                 "No correcto"))
+
+df %>% 
+  mutate(es_primera = factor(es_primera, 
+                             levels = c(0, 1), 
+                             labels = c("No es primera clase", "Si es primera clase"))) %>% 
+  group_by(es_primera, prediccion_correcta) %>% 
+  summarise(freq_abs = n()) %>% 
+  mutate(freq_rel = freq_abs / sum(freq_abs)) %>% 
+  ggplot(aes(prediccion_correcta, freq_rel, fill = prediccion_correcta)) +
+  geom_bar(stat = "identity", alpha = .6, show.legend = FALSE) +
+  facet_grid(. ~ es_primera) +
+  xlab("") +
+  ylab("Proporciones") +
+  ggtitle("Proporciones de predicciones correctas") +
+  scale_y_continuous(labels = label_percent()) +
+  scale_fill_manual(values = c("#33FF52","#FF3333"))
+
+df %>% 
+  mutate(es_primera = factor(es_primera, 
+                             levels = c(0, 1), 
+                             labels = c("No es primera clase", "Si es primera clase"))) %>% 
+  group_by(prediccion_correcta) %>% 
+  summarise(freq_abs = n()) %>% 
+  mutate(freq_rel = freq_abs / sum(freq_abs)) %>% 
+  ggplot(aes(prediccion_correcta, freq_rel, fill = prediccion_correcta)) +
+  geom_bar(stat = "identity", alpha = .6, show.legend = FALSE) +
+  xlab("") +
+  ylab("Proporciones") +
+  ggtitle("Proporciones de predicciones correctas") +
+  scale_y_continuous(labels = label_percent()) +
+  coord_cartesian(ylim = c(0, 1)) +
+  scale_fill_manual(values = c("#33FF52","#FF3333"))
 
