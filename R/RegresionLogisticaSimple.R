@@ -8,6 +8,7 @@ library(dplyr)
 library(lubridate)
 library(scales)
 library(extrafont)
+library(ggpubr)
 
 # --------------------------------------Temas------------------------------------
 
@@ -46,7 +47,8 @@ g1 + coord_cartesian(ylim = c(0, 100))
 
 ggplot(datos, aes(es_primera, fare, color = es_primera)) +
   geom_boxplot() +
-  geom_jitter(width = .1)
+  geom_jitter(width = .1) +
+  coord_cartesian(ylim = c(0, 300))
 
 ggplot(datos, aes(es_primera, fare, color = es_primera)) +
   geom_point()
@@ -88,6 +90,9 @@ annotate_figure(ggarrange(g1, g2, nrow = 1, ncol = 2),
                                 color = "black", family = FAMILIA_LETRA))
 
 
+ggplot(datos, aes(survived, age)) +
+  geom_point()
+
 # +----------------------------------+
 # | PASO 2: Generar el modelo de RLS |
 # +----------------------------------+
@@ -96,7 +101,7 @@ modelo <- glm(es_primera ~ fare, data =  datos, family = "binomial")
 summary(modelo)
 
 # INTERPRETACIÓN: Por cada unidad que se incementa la tarifa, los odds de que sea
-# un ticket de primera clase aumentan en promedio 1.0089991.
+# un ticket de primera clase aumentan en promedio 0.89%.
 
 # +----------------------------+
 # | PASO 3: Gráfico del modelo |
@@ -126,7 +131,7 @@ ggplot(df_aux, aes(fare, predicciones)) +
 anova(modelo, test = "Chisq")
 
 # Por el resultado del test el modelo se considera significativo muestra una mejora
-# en las explicaciones que el modelo nullo
+# en las explicaciones que el modelo nulo
 
 # +---------------------------------------------------------------+
 # | PASO 5: Comparación de clasificación predicha y observaciones |
@@ -134,6 +139,9 @@ anova(modelo, test = "Chisq")
 
 # Primero realizamos las predicciones con los datos
 predicciones <- ifelse(modelo$fitted.values > 0.5, 1, 0)
+
+
+
 
 # Armamos un df para ver si es capaz de clasificar correctamente
 df <- data.frame(fare = modelo$model$fare, es_primera = modelo$model$es_primera,
