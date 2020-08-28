@@ -96,6 +96,7 @@ step(modelo_it0, direction = "both")
 modelo_it1 <- lm(formula = precio ~ ancho + alto + tamanio_motor + poder + 
            maxima_rpm + tipo_combustible, data = datos)
 
+summary(modelo_it1)
 tab_model(modelo_it1)
 
 data.frame(VIF = vif(modelo_it1))
@@ -105,12 +106,14 @@ data.frame(VIF = vif(modelo_it1))
 modelo_it2 <- lm(formula = precio ~ ancho + alto + poder + 
                    maxima_rpm + tipo_combustible, data = datos)
 
+summary(modelo_it2)
 tab_model(modelo_it2)
 
 # Tercera iteración
 
 modelo_it3 <- lm(formula = precio ~ ancho + poder + tipo_combustible, data = datos)
 
+summary(modelo_it3)
 tab_model(modelo_it3)
 
 data.frame(VIF = vif(modelo_it3))
