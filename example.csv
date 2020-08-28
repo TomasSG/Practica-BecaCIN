@@ -1,0 +1,8 @@
+"","sobrevivio","clase","    sexo","     edad","   her_esp","  padre_hijo","     ticket","precio_ticket","      nro_cabina","puerto_embarcacion"
+"","0:549  ","1:216  ","female:314  ","Min.   : 0.42  ","Min.   :0.000  ","Min.   :0.0000  ","1601    :  7  ","Min.   :  0.00  ","           :687  "," :  2  "
+"","1:342  ","2:184  ","male  :577  ","1st Qu.:22.00  ","1st Qu.:0.000  ","1st Qu.:0.0000  ","347082  :  7  ","1st Qu.:  7.91  ","B96 B98    :  4  ","C:168  "
+"",NA,"3:491  ",NA,"Median :29.70  ","Median :0.000  ","Median :0.0000  ","CA. 2343:  7  ","Median : 14.45  ","C23 C25 C27:  4  ","Q: 77  "
+"",NA,NA,NA,"Mean   :29.70  ","Mean   :0.523  ","Mean   :0.3816  ","3101295 :  6  ","Mean   : 32.20  ","G6         :  4  ","S:644  "
+"",NA,NA,NA,"3rd Qu.:35.00  ","3rd Qu.:1.000  ","3rd Qu.:0.0000  ","347088  :  6  ","3rd Qu.: 31.00  ","C22 C26    :  3  ",NA
+"",NA,NA,NA,"Max.   :80.00  ","Max.   :8.000  ","Max.   :6.0000  ","CA 2144 :  6  ","Max.   :512.33  ","D          :  3  ",NA
+"",NA,NA,NA,NA,NA,NA,"(Other) :852  ",NA,"(Other)    :186  ",NA
