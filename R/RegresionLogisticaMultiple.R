@@ -2,6 +2,9 @@
 
 library(dplyr)
 library(ggplot2)
+library(ggpubr)
+
+source("./R/Utils.R")
 
 # --------------------------------------Datos------------------------------------
 
@@ -15,7 +18,6 @@ datos_it0 <- datos_crudos %>%
   rename(sobrevivio = Survived, clase = Pclass, sexo = Sex, edad = Age, her_esp = SibSp,
          padre_hijo = Parch, ticket = Ticket, precio_ticket = Fare, nro_cabina = Cabin,
          puerto_embarcacion = Embarked)
-
 
 # --------------------------------------Exploración datos------------------------------------
 
@@ -35,3 +37,30 @@ datos_it1 <- datos_it0 %>%
          puerto_embarcacion = as.factor(puerto_embarcacion)) 
   
 write.csv(summary(datos_it1), file = "./resultados/summary_datos_it1.csv")
+
+# Análisis variables categóricas de interés
+
+g0 <- ggplot(datos_it1, aes(y = ..count.. / sum(..count..))) 
+g1 <- g0 + geom_bar(aes(x = clase)) + ylab("")
+g2 <- g0 + geom_bar(aes(x = sexo)) + ylab("")
+g3 <- g0 + geom_bar(aes(x = sobrevivio)) + ylab("")
+
+arrange <- ggarrange(g1, g2, g3, nrow = 3, ncol = 1)
+
+annotate_figure(arrange, 
+                top = text_grob("Análisis variables categóricas"))
+
+# Análisis variables cuantitativas de interés
+
+n <- nrow(datos_it1)
+g0 <- ggplot(datos_it1)
+g1 <- g0 + geom_histogram(aes(precio_ticket, ..density..), bins = calcular_cant_bins(n),
+                          fill = "white", color = "blue", alpha = .4)
+g2 <- g0 + geom_boxplot(aes(precio_ticket))
+g3 <- g0 + geom_histogram(aes(edad, ..density..), bins = calcular_cant_bins(n),
+                          fill = "white", color = "blue", alpha = .4)
+g4 <- g0 + geom_boxplot(aes(edad))
+
+arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
+annotate_figure(arrange,
+                top = text_grob("Análisis variables cuantitativas"))
