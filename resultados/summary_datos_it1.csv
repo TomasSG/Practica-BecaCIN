@@ -1,0 +1,18 @@
+,     edad,   her_esp,  padre_hijo,precio_ticket,
+Min,0.42,0,0,0,
+1st Qu,22,0,0,7.91,
+Median,29.7,0,0,14.45,
+Mean ,29.7,0.523,0.3816,32.2,
+3rd Qu.,35,1,0,31,
+Max.,80,8,6,512.33,
+,,,,,
+,,,,,
+,,,,,
+sobrevivio,clase,    sexo,puerto_embarcacion,      nro_cabina,     ticket
+0: 549,1: 216,female: 314  ,: 2,: 687,1601: 7
+1: 342,2: 184,male  : 577  ,C: 168  ,B96 B98:  4  ,347082  :  7  
+,3: 491,,Q: 77  ,C23 C25 C27:  4  ,CA. 2343:  7  
+,,,S: 644  ,G6         :  4  ,3101295 :  6  
+,,,,C22 C26    :  3  ,347088  :  6  
+,,,,D          :  3  ,CA 2144 :  6  
+,,,,(Other)    :186  ,(Other) :852  
