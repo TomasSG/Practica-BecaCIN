@@ -64,3 +64,30 @@ g4 <- g0 + geom_boxplot(aes(edad))
 arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
 annotate_figure(arrange,
                 top = text_grob("Análisis variables cuantitativas"))
+
+# Cuantitativas contra sobrevivio
+
+g0 <- ggplot(datos_it1, aes(x = sobrevivio, color = sobrevivio))
+g1 <- g0 + geom_boxplot(aes(y = precio_ticket))
+g2 <- g0 + geom_boxplot(aes(y = edad))
+
+arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+
+annotate_figure(arrange,
+                top = text_grob("Variables cuantitativas contra sobrevivio"))
+# zoom
+
+g1 + coord_cartesian(ylim = c(0, 100)) + ggtitle("Precio del ticket contra sobrevivio (zoom)")
+
+# cualitativas contra sobrevivio
+
+g1 <- hacer_barplot_con_dos_cuantitativas(datos_it1, "clase", "sobrevivio")
+g2 <- hacer_barplot_con_dos_cuantitativas(datos_it1, "sexo", "sobrevivio")
+
+arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+annotate_figure(arrange,
+                top = text_grob("Análisis sobrevivio vs resto de cualitativas"))
+
+# --------------------------------------Regresión Logística Múltiple------------------------------------
+
+
