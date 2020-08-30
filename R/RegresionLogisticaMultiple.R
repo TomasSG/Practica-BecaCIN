@@ -90,4 +90,20 @@ annotate_figure(arrange,
 
 # --------------------------------------Regresión Logística Múltiple------------------------------------
 
+# Generamos le modelo
+
+modelo_it0 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, data = datos_it1,
+                  family = "binomial")
+
+write.csv(summary(modelo_it0)$coefficients, "./resultados/summary_log_modeloit0.csv")
+
+# Sacamos las variables que no son significativas
+
+modelo_it1 <- glm(sobrevivio ~ clase + sexo + edad, data = datos_it1, family = "binomial")
+
+write.csv(summary(modelo_it1)$coefficients, "./resultados/summary_log_modeloit1.csv")
+
+# Buscamos el valor de crote óptimo
+
+
 

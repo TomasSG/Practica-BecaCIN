@@ -2,6 +2,7 @@
 
 library(purrr)
 library(rlang)
+library(caret) #confusionMatrix
 
 # --------------------------------------Funciones------------------------------------
 
@@ -23,4 +24,50 @@ hacer_barplot_con_dos_cuantitativas <- function(datos, var1, var2){
     geom_bar(alpha = .6, stat = "identity", position =  "dodge2")
     
 }
+
+
+obtener_resultados_todos_posibles_valores_criticos<- function(valores_reales, 
+                                                              valor_corte = .5, 
+                                                              probabilidades_estimadas, 
+                                                              signo_negativo = 0, 
+                                                              signo_positivo = 1,
+                                                              separacion = .01) {
+  valores_criticos <- seq(0, 1, separacion)
+  df_resultado <- map(valores_criticos, 
+                      obtener_resultados_matriz_confusion,
+                      valores_reales = valores_reales,
+                      probabilidades_estimadas = probabilidades_estimadas,
+                      signo_negativo = signo_negativo,
+                      signo_positivo = signo_positivo)
+  return(df_resultado)
+}
+
+
+obtener_resultados_matriz_confusion <- function(valor_corte = .5,
+                                                valores_reales, 
+                                                probabilidades_estimadas, 
+                                                signo_negativo = 0, 
+                                                signo_positivo = 1) {
+  
+  # Realizo las predicciones con el valor de corte
+  predicciones <- as.factor(ifelse(probabilidades_estimadas > valor_corte, signo_positivo, signo_negativo))
+  
+  # Obtengo la matriz de confusión
+  matriz <- confusionMatrix(predicciones, valores_reales)
+  
+  # Extraigo la información que me interesa
+  sensitividad <- matriz$byClass["Sensitivity"]
+  especificidad <- matriz$byClass["Specificity"]
+  accuracy <- matriz$overall["Accuracy"]
+  
+  df_resultado <- data.frame("valor_corte" = valor_corte,
+                             "sensitividad" = sensitividad,
+                             "especificidad" = especificidad,
+                             "accuracy" = accuracy,
+                             row.names = NULL)
+  return(df_resultado)
+}
+
+
+
 
