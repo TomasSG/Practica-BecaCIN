@@ -256,22 +256,26 @@ write.csv(aux, "./resultados/valores_corte.csv")
 
 # Código para hacerlo más lindo
 
-tipos_lineas <- c("sensitividad_linea" = "k", "especificidad_linea" = "d")
-color <- c("sensitividad_color" = "darkblue", "especificidad_color" = "firebrick")
+df_grafico <- data.frame(valor_corte = df_valores_corte$valor_corte,
+                         valor =df_valores_corte$sensitividad,
+                         curva = "Sensitividad")
 
-ggplot(df_valores_corte, aes(x = valor_corte)) +
-  geom_line(aes(y = sensitividad, color = "sensitividad_color", linetype = "sensitividad_linea")
-            , color = "darkblue", size = 1.3) +
-  geom_line(aes(y = especificidad, color = "especificidad_color", linetype = "especificidad_linea"),
-            color = "firebrick", size = 1.3) +
+df_grafico <- rbind(df_grafico, data.frame(valor_corte = df_valores_corte$valor_corte,
+                                           valor =df_valores_corte$especificidad,
+                                           curva = "Especificidad"))
+
+ggplot(mapping = aes(x = valor_corte)) +
+  geom_line(df_grafico %>% filter(curva == "Sensitividad"), mapping =  aes(y = valor, color = curva, 
+                                                      linetype = curva), size = 1.3) +
+  geom_line(df_grafico %>% filter(curva == "Especificidad"), mapping =  aes(y = valor, color = curva, 
+                                                      linetype = curva), size = 1.3) +
   xlab("Valor de Corte") +
   ylab("") + 
   ggtitle("Análisis de Posibles Valores de Corte") +
-  labs(linetype = "Curva") +
   scale_y_continuous(labels = label_percent()) +
-  scale_x_continuous(breaks = seq(0, 1, .1)) +
-  scale_linetype_manual(labels = c("Sensitividad", "Especificidad"),
-                        values = c("k", "d"))
+  scale_x_continuous(breaks = seq(0, 1, .1)) 
+
+rm(df_grafico)
 
 ggplot(df_valores_corte, aes(valor_corte, accuracy)) + geom_line()
 
