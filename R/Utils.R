@@ -21,7 +21,9 @@ hacer_barplot_con_dos_cuantitativas <- function(datos, var1, var2){
     summarise(n = n()) %>% 
     mutate(freq_rel = n / sum(n)) %>% 
     ggplot(aes_string(var1, "freq_rel", group = var2, fill = var2)) +
-    geom_bar(alpha = .6, stat = "identity", position =  "dodge2")
+    geom_bar(alpha = .6, stat = "identity", position =  "dodge2") +
+    ylab("") +
+    scale_y_continuous(labels = label_percent())
     
 }
 

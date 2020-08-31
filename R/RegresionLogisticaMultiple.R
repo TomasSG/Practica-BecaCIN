@@ -5,6 +5,9 @@ library(ggplot2)
 library(ggpubr)
 library(caret) #confusionMatrix
 library(car) #vif
+library(ggthemes)
+library(scales)
+library(extrafont)
 
 
 source("./R/Utils.R")
@@ -35,7 +38,9 @@ datos_it0$edad <- replace(datos_it0$edad, lista_indices, media_edad)
 
 
 datos_it1 <- datos_it0 %>% 
-  mutate(sobrevivio = as.factor(sobrevivio), clase = as.factor(clase), sexo = as.factor(sexo),
+  mutate(sobrevivio = factor(sobrevivio, levels = c(1, 0), labels = c("Sí", "No")), 
+         clase = factor(clase, levels = c(1, 2, 3), labels = c("1ra", "2da", "3ra")), 
+         sexo = factor(sexo, levels = c("male", "female"), labels = c("Hombre", "Mujer")),
          nro_cabina = as.factor(nro_cabina), ticket = as.factor(ticket),
          puerto_embarcacion = as.factor(puerto_embarcacion)) 
   
@@ -43,61 +48,100 @@ write.csv(summary(datos_it1), file = "./resultados/summary_datos_it1.csv")
 
 # Análisis variables categóricas de interés
 
-g0 <- ggplot(datos_it1, aes(y = ..count.. / sum(..count..))) 
-g1 <- g0 + geom_bar(aes(x = clase)) + ylab("")
-g2 <- g0 + geom_bar(aes(x = sexo)) + ylab("")
-g3 <- g0 + geom_bar(aes(x = sobrevivio)) + ylab("")
-
-arrange <- ggarrange(g1, g2, g3, nrow = 3, ncol = 1)
-
-annotate_figure(arrange, 
-                top = text_grob("Análisis variables categóricas"))
+{
+  g0 <- ggplot(datos_it1, aes(y = ..count.. / sum(..count..))) + scale_y_continuous(labels = label_percent())
+  g1 <- g0 + geom_bar(aes(x = clase), fill = "firebrick", alpha = .6) + ylab("") + xlab("Clase")
+  g2 <- g0 + geom_bar(aes(x = sexo), fill = "darkblue", alpha = .6) + ylab("") + xlab("Sexo")
+  g3 <- g0 + geom_bar(aes(x = sobrevivio), fill = "darkorange", alpha = .6) + ylab("") + xlab("Sobrevivió")
+  
+  arrange <- ggarrange(g1, g2, g3, nrow = 3, ncol = 1)
+  
+  annotate_figure(arrange, 
+                  top = text_grob("Análisis Variables Categóricas", face = "bold", size = 20,
+                                  family = "Dubai Medium", hjust = .5))
+}
 
 # Análisis variables cuantitativas de interés
 
-n <- nrow(datos_it1)
-g0 <- ggplot(datos_it1)
-g1 <- g0 + geom_histogram(aes(precio_ticket, ..density..), bins = calcular_cant_bins(n),
-                          fill = "white", color = "blue", alpha = .4)
-g2 <- g0 + geom_boxplot(aes(precio_ticket))
-g3 <- g0 + geom_histogram(aes(edad, ..density..), bins = calcular_cant_bins(n),
-                          fill = "white", color = "blue", alpha = .4)
-g4 <- g0 + geom_boxplot(aes(edad))
+{
+  n <- nrow(datos_it1)
+  g0 <- ggplot(datos_it1)
+  
+  g1 <- g0 + geom_histogram(aes(precio_ticket, ..density..), bins = calcular_cant_bins(n),
+                            fill = "white", color = "darkblue",  alpha = .4) + 
+    ylab("") +
+    xlab("Precio Ticket") +
+    scale_x_continuous(labels = label_number(prefix = "$"))
+  
+  g2 <- g0 + geom_boxplot(aes(precio_ticket), color = "darkblue") +
+    ylab("") +
+    xlab("Precio Ticket") +
+    scale_x_continuous(labels = label_number(prefix = "$")) +
+    theme(axis.text.y = element_blank())
+  
+  g3 <- g0 + geom_histogram(aes(edad, ..density..), bins = calcular_cant_bins(n),
+                            color = "firebrick", fill = "white", alpha = .4) +
+    ylab("") +
+    xlab("Edad") 
 
-arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
-annotate_figure(arrange,
-                top = text_grob("Análisis variables cuantitativas"))
+  g4 <- g0 + geom_boxplot(aes(edad), color = "firebrick") +
+    ylab("") +
+    xlab("Edad") +
+    theme(axis.text.y = element_blank())
+  
+  arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
+  annotate_figure(arrange, 
+                  top = text_grob("Análisis Variables Cuantitativas", face = "bold", size = 20,
+                                  family = "Dubai Medium", hjust = .5))
+}
 
 # Cuantitativas contra sobrevivio
 
-g0 <- ggplot(datos_it1, aes(x = sobrevivio, color = sobrevivio))
-g1 <- g0 + geom_boxplot(aes(y = precio_ticket))
-g2 <- g0 + geom_boxplot(aes(y = edad))
+{
+  g0 <- ggplot(datos_it1, aes(x = sobrevivio, color = sobrevivio)) + xlab("")
+  
+  g1 <- g0 + geom_boxplot(aes(y = precio_ticket)) +
+    ylab("Precio Ticket") +
+    scale_y_continuous(labels = label_number(prefix = "$"))
+  
+  g2 <- g0 + geom_boxplot(aes(y = edad)) +
+    ylab("Edad")
+  
+  arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+  annotate_figure(arrange, 
+                  top = text_grob("Variables Cuantitativas vs Sobrevivio", face = "bold", size = 20,
+                                  family = "Dubai Medium", hjust = .5))
+}
 
-arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
-
-annotate_figure(arrange,
-                top = text_grob("Variables cuantitativas contra sobrevivio"))
 # zoom
 
-g1 + coord_cartesian(ylim = c(0, 100)) + ggtitle("Precio del ticket contra sobrevivio (zoom)")
+g1 + coord_cartesian(ylim = c(0, 100)) + 
+  ggtitle("Precio Ticket vs Sobrevivió (con zoom)") +
+  theme(legend.position =  "none") +
+  xlab("Sobrevivió")
+  
 
 # cualitativas contra sobrevivio
 
-g1 <- hacer_barplot_con_dos_cuantitativas(datos_it1, "clase", "sobrevivio")
-g2 <- hacer_barplot_con_dos_cuantitativas(datos_it1, "sexo", "sobrevivio")
+{
+  g1 <- hacer_barplot_con_dos_cuantitativas(datos_it1, "clase", "sobrevivio") +
+    xlab("Clase")
+  
+  g2 <- hacer_barplot_con_dos_cuantitativas(datos_it1, "sexo", "sobrevivio") +
+    xlab("Sexo")
+  
+  arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+  annotate_figure(arrange, 
+                  top = text_grob("Análisis Sobrevivió vs Cualitativas", face = "bold", size = 20,
+                                  family = "Dubai Medium", hjust = .5))
+}
 
-arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
-annotate_figure(arrange,
-                top = text_grob("Análisis sobrevivio vs resto de cualitativas"))
-
-
-t1 <- table(datos_it1$sobrevivio, datos_it1$clase)
-t2 <- table(datos_it1$sobrevivio, datos_it1$sexo)
-
-write.csv(t1, "./resultados/t1.csv")
-write.csv(t2, "./resultados/t2.csv")
-
+{
+  t1 <- table(datos_it1$sobrevivio, datos_it1$clase)
+  t2 <- table(datos_it1$sobrevivio, datos_it1$sexo)
+  write.csv(t1, "./resultados/t1.csv")
+  write.csv(t2, "./resultados/t2.csv")
+}
 # --------------------------------------Regresión Logística Múltiple------------------------------------
 
 # Generamos le modelo
@@ -127,23 +171,42 @@ df_residuos <- data.frame(d_residuos = residuals(modelo_it1, type = "deviance"),
 
 ggplot(df_residuos, aes(valores_ajustado, d_residuos)) +
   geom_point() +
-  geom_hline(yintercept = 2, color = "firebrick") +
-  geom_hline(yintercept = - 2, color = "firebrick")
+  geom_hline(yintercept = c(2, -2), color = "firebrick", size = 1.3, linetype = 2) +
+  ylab("Residuos de Deviancia") +
+  xlab("Valores Ajustados") +
+  ggtitle("Análisis de Residuos") 
 
 indices <- which(abs(df_residuos$d_residuos) >= 2)
 
 df_obs_mal_ajuste <- datos_it1[indices,]
 
-g0 <- ggplot(df_obs_mal_ajuste)
-g1 <- g0 + geom_boxplot(aes(edad))
-g2 <- g0 + geom_boxplot(aes(precio_ticket))
-g3 <- g0 + geom_bar(aes(sexo, ..count.. / sum(..count..)))
-g4 <- g0 + geom_bar(aes(clase, ..count.. / sum(..count..)))
-
-arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
-
-annotate_figure(arrange,
-                top = text_grob("Análisis observaciones con mal ajuste"))
+{
+  g0 <- ggplot(df_obs_mal_ajuste) + ylab("")
+  
+  g1 <- g0 + geom_boxplot(aes(edad), color = "firebrick") +
+    xlab("Edad") +
+    theme(axis.text.y = element_blank())
+  
+  g2 <- g0 + geom_boxplot(aes(precio_ticket), color = "darkblue") +
+    xlab("Precio Ticket") +
+    theme(axis.text.y = element_blank()) +
+    scale_x_continuous(labels = label_number(prefix = "$"))
+  
+  g3 <- g0 + geom_bar(aes(sexo, ..count.. / sum(..count..)), fill = "white", color = "darkorange", alpha = .4) +
+    scale_y_continuous(labels = label_percent()) +
+    xlab("Sexo")
+  
+  
+  g4 <- g0 + geom_bar(aes(clase, ..count.. / sum(..count..)), fill = "white", color = "tomato", alpha = .4) +
+    scale_y_continuous(labels = label_percent()) +
+    xlab("Clase")
+  
+  arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
+  
+  annotate_figure(arrange, 
+                  top = text_grob("Análisis Observaciones con Mal Ajuste", face = "bold", size = 20,
+                                  family = "Dubai Medium", hjust = .5))
+}
 
 # Busqueda outliers y puntos influyentes
 
@@ -197,11 +260,18 @@ tipos_lineas <- c("sensitividad_linea" = "k", "especificidad_linea" = "d")
 color <- c("sensitividad_color" = "darkblue", "especificidad_color" = "firebrick")
 
 ggplot(df_valores_corte, aes(x = valor_corte)) +
-  geom_line(aes(y = sensitividad, linetype = "sensitividad_linea", color = "sensitividad_color")
+  geom_line(aes(y = sensitividad, color = "sensitividad_color", linetype = "sensitividad_linea")
             , color = "darkblue", size = 1.3) +
-  geom_line(aes(y = especificidad, linetype = "especificidad_linea", color = "especificidad_color"),
-            color = "firebrick", size = 1.3) + 
-  scale_x_continuous(breaks = seq(0, 1, .1))
+  geom_line(aes(y = especificidad, color = "especificidad_color", linetype = "especificidad_linea"),
+            color = "firebrick", size = 1.3) +
+  xlab("Valor de Corte") +
+  ylab("") + 
+  ggtitle("Análisis de Posibles Valores de Corte") +
+  labs(linetype = "Curva") +
+  scale_y_continuous(labels = label_percent()) +
+  scale_x_continuous(breaks = seq(0, 1, .1)) +
+  scale_linetype_manual(labels = c("Sensitividad", "Especificidad"),
+                        values = c("k", "d"))
 
 ggplot(df_valores_corte, aes(valor_corte, accuracy)) + geom_line()
 
@@ -209,16 +279,22 @@ ggplot(df_valores_corte, aes(valor_corte, accuracy)) + geom_line()
 
 valor_corte <- .43
 
-datos_it2 <- datos_it1 %>% 
-  mutate(sobrevivio = factor(sobrevivio,
-                             levels = c(1, 0),
-                             labels = c("Si", "No")))
-
 predicciones <- ifelse(modelo_it1$fitted.values > valor_corte, 1, 0)
 predicciones_factor <- factor(predicciones,
                               levels = c(1, 0),
-                              labels = c("Si", "No"))
+                              labels = c("Sí", "No"))
 
-matriz_confusion <- confusionMatrix(predicciones_factor, datos_it2$sobrevivio)
+matriz_confusion <- confusionMatrix(predicciones_factor, datos_it1$sobrevivio)
 write.csv(matriz_confusion$table, "./resultados/matriz_confusion.csv")
+
+# --------------------------------------Tema ggplot------------------------------------
+
+tema_viejo <- theme_get()
+theme_set(theme_gdocs() + theme(text = element_text(family = "Dubai Medium"),
+                                axis.title = element_text(face = "italic", size = 15),
+                                plot.title = element_text(hjust = .5, face = "bold", size = 20)))
+
+
+
+
 
