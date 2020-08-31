@@ -4,6 +4,7 @@ library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(caret) #confusionMatrix
+library(car) #vif
 
 
 source("./R/Utils.R")
@@ -116,19 +117,79 @@ write.csv(summary(modelo_it1)$coefficients, "./resultados/summary_log_modeloit1.
 
 step(modelo_it1, direction = "both")
 
-# Buscamos posibles outliers
+# Buscamos puntos de mal ajuste
 
-ggplot(modelo_it1$df.residual)
+df_residuos <- data.frame(d_residuos = residuals(modelo_it1, type = "deviance"),
+                         residuos = modelo_it1$residuals,
+                         valores_ajustado = modelo_it1$fitted.values)
+
+
+
+ggplot(df_residuos, aes(valores_ajustado, d_residuos)) +
+  geom_point() +
+  geom_hline(yintercept = 2, color = "firebrick") +
+  geom_hline(yintercept = - 2, color = "firebrick")
+
+indices <- which(abs(df_residuos$d_residuos) >= 2)
+
+df_obs_mal_ajuste <- datos_it1[indices,]
+
+g0 <- ggplot(df_obs_mal_ajuste)
+g1 <- g0 + geom_boxplot(aes(edad))
+g2 <- g0 + geom_boxplot(aes(precio_ticket))
+g3 <- g0 + geom_bar(aes(sexo, ..count.. / sum(..count..)))
+g4 <- g0 + geom_bar(aes(clase, ..count.. / sum(..count..)))
+
+arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
+
+annotate_figure(arrange,
+                top = text_grob("Análisis observaciones con mal ajuste"))
+
+# Busqueda outliers y puntos influyentes
+
+puntos_influyentes_outliers <- data.frame(leverage = hatvalues(modelo_it1),
+                                          distancia_cook = cooks.distance(modelo_it1))
+
+puntos_influyentes_outliers <- puntos_influyentes_outliers %>% arrange(-distancia_cook)
+
+# Nos quedamos con los primeros 3 valores
+
+head(puntos_influyentes_outliers, n = 3)
+write.csv(head(puntos_influyentes_outliers, n = 3), "./resultados/head_puntos_influyentes.csv")
+indices_influyentes <- c(298, 631, 571)
+
+# Vemos si alguno de estos valores influyentes son los que tienen mal ajuste
+
+indices_coincidentes <- intersect(indices, indices_influyentes)
+
+write.csv(datos_it1[indices_coincidentes,], "./resultados/observaciones_influyentes_outliers.csv")
+
+# Nuevo modelo sin estas observaciones
+
+modelo_it2 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, 
+                  data = datos_it1[-indices_coincidentes,],
+                  family = "binomial")
+summary(modelo_it2)
+
+#Seleccionamos variables
+
+step(modelo_it2, direction = "both")
+
+modelo_it3 <- glm(formula = sobrevivio ~ clase + sexo + edad, family = "binomial", 
+                  data = datos_it1[-indices_coincidentes, ])
+write.csv(summary(modelo_it3)$coefficients, "./resultados/summary_log_modeloit3.csv")
 
 # Buscamos el valor de corte óptimo
 
 df_valores_corte <- obtener_resultados_todos_posibles_valores_criticos(
-  valores_reales = datos_it1$sobrevivio,
-  probabilidades_estimadas = modelo_it1$fitted.values)
+  valores_reales = datos_it1[-indices_coincidentes,]$sobrevivio,
+  probabilidades_estimadas = modelo_it3$fitted.values)
 
 # Buscamos el punto de intersección entre ambas curvas
 
-df_valores_corte %>% dplyr::filter(abs(sensitividad - especificidad) < 0.01)
+aux <- df_valores_corte %>% dplyr::filter(abs(sensitividad - especificidad) < 0.01)
+write.csv(aux, "./resultados/valores_corte.csv")
+
 
 # Código para hacerlo más lindo
 
@@ -146,7 +207,7 @@ ggplot(df_valores_corte, aes(valor_corte, accuracy)) + geom_line()
 
 # Hacemos la matriz de confusión para el valor de corte
 
-valor_corte <- .42
+valor_corte <- .43
 
 datos_it2 <- datos_it1 %>% 
   mutate(sobrevivio = factor(sobrevivio,
