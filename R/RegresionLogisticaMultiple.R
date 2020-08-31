@@ -3,6 +3,8 @@
 library(dplyr)
 library(ggplot2)
 library(ggpubr)
+library(caret) #confusionMatrix
+
 
 source("./R/Utils.R")
 
@@ -88,6 +90,13 @@ arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = 
 annotate_figure(arrange,
                 top = text_grob("Análisis sobrevivio vs resto de cualitativas"))
 
+
+t1 <- table(datos_it1$sobrevivio, datos_it1$clase)
+t2 <- table(datos_it1$sobrevivio, datos_it1$sexo)
+
+write.csv(t1, "./resultados/t1.csv")
+write.csv(t2, "./resultados/t2.csv")
+
 # --------------------------------------Regresión Logística Múltiple------------------------------------
 
 # Generamos le modelo
@@ -103,7 +112,52 @@ modelo_it1 <- glm(sobrevivio ~ clase + sexo + edad, data = datos_it1, family = "
 
 write.csv(summary(modelo_it1)$coefficients, "./resultados/summary_log_modeloit1.csv")
 
-# Buscamos el valor de crote óptimo
+# Aplicamos la técnica de stepwise para seleccionar variables
 
+step(modelo_it1, direction = "both")
 
+# Buscamos posibles outliers
+
+ggplot(modelo_it1$df.residual)
+
+# Buscamos el valor de corte óptimo
+
+df_valores_corte <- obtener_resultados_todos_posibles_valores_criticos(
+  valores_reales = datos_it1$sobrevivio,
+  probabilidades_estimadas = modelo_it1$fitted.values)
+
+# Buscamos el punto de intersección entre ambas curvas
+
+df_valores_corte %>% dplyr::filter(abs(sensitividad - especificidad) < 0.01)
+
+# Código para hacerlo más lindo
+
+tipos_lineas <- c("sensitividad_linea" = "k", "especificidad_linea" = "d")
+color <- c("sensitividad_color" = "darkblue", "especificidad_color" = "firebrick")
+
+ggplot(df_valores_corte, aes(x = valor_corte)) +
+  geom_line(aes(y = sensitividad, linetype = "sensitividad_linea", color = "sensitividad_color")
+            , color = "darkblue", size = 1.3) +
+  geom_line(aes(y = especificidad, linetype = "especificidad_linea", color = "especificidad_color"),
+            color = "firebrick", size = 1.3) + 
+  scale_x_continuous(breaks = seq(0, 1, .1))
+
+ggplot(df_valores_corte, aes(valor_corte, accuracy)) + geom_line()
+
+# Hacemos la matriz de confusión para el valor de corte
+
+valor_corte <- .42
+
+datos_it2 <- datos_it1 %>% 
+  mutate(sobrevivio = factor(sobrevivio,
+                             levels = c(1, 0),
+                             labels = c("Si", "No")))
+
+predicciones <- ifelse(modelo_it1$fitted.values > valor_corte, 1, 0)
+predicciones_factor <- factor(predicciones,
+                              levels = c(1, 0),
+                              labels = c("Si", "No"))
+
+matriz_confusion <- confusionMatrix(predicciones_factor, datos_it2$sobrevivio)
+write.csv(matriz_confusion$table, "./resultados/matriz_confusion.csv")
 

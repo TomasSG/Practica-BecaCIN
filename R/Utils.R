@@ -27,13 +27,18 @@ hacer_barplot_con_dos_cuantitativas <- function(datos, var1, var2){
 
 
 obtener_resultados_todos_posibles_valores_criticos<- function(valores_reales, 
-                                                              valor_corte = .5, 
                                                               probabilidades_estimadas, 
                                                               signo_negativo = 0, 
                                                               signo_positivo = 1,
                                                               separacion = .01) {
+  # Creo los valores críticos
+  
   valores_criticos <- seq(0, 1, separacion)
-  df_resultado <- map(valores_criticos, 
+  
+  # Llamo iterativamente a obtener_resultados_matriz_confusion con distintos
+  # valores críticos
+  
+  df_resultado <- map_df(valores_criticos, 
                       obtener_resultados_matriz_confusion,
                       valores_reales = valores_reales,
                       probabilidades_estimadas = probabilidades_estimadas,
@@ -50,12 +55,16 @@ obtener_resultados_matriz_confusion <- function(valor_corte = .5,
                                                 signo_positivo = 1) {
   
   # Realizo las predicciones con el valor de corte
-  predicciones <- as.factor(ifelse(probabilidades_estimadas > valor_corte, signo_positivo, signo_negativo))
+  
+  predicciones <- ifelse(probabilidades_estimadas > valor_corte, signo_positivo, signo_negativo)
+  predicciones_factor <- factor(predicciones, levels = levels(valores_reales))
   
   # Obtengo la matriz de confusión
-  matriz <- confusionMatrix(predicciones, valores_reales)
+  
+  matriz <- confusionMatrix(predicciones_factor, valores_reales)
   
   # Extraigo la información que me interesa
+  
   sensitividad <- matriz$byClass["Sensitivity"]
   especificidad <- matriz$byClass["Specificity"]
   accuracy <- matriz$overall["Accuracy"]
@@ -67,7 +76,5 @@ obtener_resultados_matriz_confusion <- function(valor_corte = .5,
                              row.names = NULL)
   return(df_resultado)
 }
-
-
 
 
