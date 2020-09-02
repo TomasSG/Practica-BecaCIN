@@ -80,3 +80,12 @@ obtener_resultados_matriz_confusion <- function(valor_corte = .5,
 }
 
 
+calcular_pseudo_R2 <- function(modelo) {
+  # Usamos el McFadden pseudo R2
+  
+  pseudo_R2 <- 1 -(modelo$deviance / modelo$null.deviance)
+  p_valor <- pchisq(2*(modelo$deviance - modelo$null.deviance), df = length(modelo$coefficients) - 1)
+  return(c("pseudo_R2" = pseudo_R2, "p_valor" = p_valor))
+}
+
+

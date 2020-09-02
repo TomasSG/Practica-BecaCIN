@@ -151,11 +151,15 @@ modelo_it0 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, data = datos
 
 write.csv(summary(modelo_it0)$coefficients, "./resultados/summary_log_modeloit0.csv")
 
+calcular_pseudo_R2(modelo_it0)
+
 # Sacamos las variables que no son significativas
 
 modelo_it1 <- glm(sobrevivio ~ clase + sexo + edad, data = datos_it1, family = "binomial")
 
 write.csv(summary(modelo_it1)$coefficients, "./resultados/summary_log_modeloit1.csv")
+
+calcular_pseudo_R2(modelo_it1)
 
 # Aplicamos la técnica de stepwise para seleccionar variables
 
@@ -234,6 +238,8 @@ modelo_it2 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket,
                   family = "binomial")
 summary(modelo_it2)
 
+calcular_pseudo_R2(modelo_it2)
+
 #Seleccionamos variables
 
 step(modelo_it2, direction = "both")
@@ -241,6 +247,8 @@ step(modelo_it2, direction = "both")
 modelo_it3 <- glm(formula = sobrevivio ~ clase + sexo + edad, family = "binomial", 
                   data = datos_it1[-indices_coincidentes, ])
 write.csv(summary(modelo_it3)$coefficients, "./resultados/summary_log_modeloit3.csv")
+
+calcular_pseudo_R2(modelo_it3)
 
 # Buscamos el valor de corte óptimo
 
