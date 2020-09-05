@@ -163,7 +163,7 @@ calcular_pseudo_R2(modelo_it1)
 
 # Aplicamos la técnica de stepwise para seleccionar variables
 
-step(modelo_it1, direction = "both")
+step(modelo_it0, direction = "both")
 
 # Buscamos puntos de mal ajuste
 
