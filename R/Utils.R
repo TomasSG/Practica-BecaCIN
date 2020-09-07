@@ -88,4 +88,13 @@ calcular_pseudo_R2 <- function(modelo) {
   return(c("pseudo_R2" = pseudo_R2, "p_valor" = p_valor))
 }
 
+medidas_resumen <- function(data, remover_na = FALSE) {
+  data_frame_resultado <- data.frame(media = mean(data, na.rm = remover_na),
+                                     mediana = median(data, na.rm = remover_na),
+                                     primer_cuartil = quantile(data, probs = .25, na.rm = remover_na),
+                                     tercer_cuartil = quantile(data, probs = .75, na.rm = remover_na),
+                                     desvio = sd(data, na.rm = remover_na),
+                                    row.names = names(data)[1])
+  return(data_frame_resultado)
+}
 

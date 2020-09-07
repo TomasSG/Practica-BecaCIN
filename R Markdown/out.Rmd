@@ -1,0 +1,91 @@
+---
+title: "Regresión Logística Múltiple"
+author: "Tomás Sánchez Grigioni"
+date: "6/9/2020"
+output: 
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+# Bilbiotecas a usar
+
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(caret) #confusionMatrix
+library(car) #vif
+library(ggthemes)
+library(scales)
+library(extrafont)
+library(knitr)
+library(purrr)
+
+# Opciones en general
+
+opts_chunk$set(echo = TRUE)
+
+# Cargo funciones útiles
+
+source("../R/Utils.R")
+```
+
+Para acceder al data set usar este [link](https://www.kaggle.com/c/titanic/data?select=train.csv)
+
+# Exploración de Datos
+
+Primero nombramos las variables a usar y sus respectivos significados
+
+|Nombres Variables|Definición|Valores|Tipo|
+|:---------------:|:---------|:-----:|:--:|
+|sobrevivio|Sobrevivio al accidente|0 = No, 1 = Si|Categórica|
+|clase|Clase del ticket|1 = 1st, 2 = 2nd, 3 = 3rd|Categórica|
+|sexo|Sexo|-|Categórica|	
+|edad|Edad en años|-|Continua|	
+|her_esp|Cantidad de hermanos/conyuges en el Titanic|-|Discreta|
+|padre_hijo|Cantidad de padres/hijos en el Titanic|-|Discreta|
+|ticket|Numero de ticket|-|Categórica|	
+|precio_ticket|Precio del ticket|-|Continua|
+|nro_cabina|Número de cabina|-|Categórica|	
+|puerto_embarcacion|Puerto de embarcación|C = Cherbourg, Q = Queenstown, S = Southampton|Categórica|
+
+```{r, echo = FALSE}
+datos_crudos <- read.csv(file ="../data/train.csv")
+
+# Renombramos variables y dejamos las que no son de interes
+
+datos_crudos$PassengerId <- NULL
+datos_crudos$Name <- NULL
+datos_it0 <- datos_crudos %>% 
+  rename(sobrevivio = Survived, clase = Pclass, sexo = Sex, edad = Age, her_esp = SibSp,
+         padre_hijo = Parch, ticket = Ticket, precio_ticket = Fare, nro_cabina = Cabin,
+         puerto_embarcacion = Embarked)
+```
+
+Analizamos como identifica R los datos  para ver si es necesario realizar alguna modificación
+
+```{r}
+str(datos_it0)
+```
+
+Como se observa a las variables **sobrevivio**, **clase**, **sexo**, **ticket**, **nro_cabina** y **puerto_embarcación** no las esta tratando como un factor, entonces necesitamos modificarlas
+
+```{r}
+datos_it1 <- datos_it0 %>% 
+  mutate(sobrevivio = factor(sobrevivio, levels = c(1, 0), labels = c("Sí", "No")), 
+         clase = factor(clase, levels = c(1, 2, 3), labels = c("1ra", "2da", "3ra")), 
+         sexo = factor(sexo, levels = c("male", "female"), labels = c("Hombre", "Mujer")),
+         nro_cabina = as.factor(nro_cabina), 
+         ticket = as.factor(ticket),
+         puerto_embarcacion = as.factor(puerto_embarcacion))
+
+str(datos_it1)
+```
+
+Ahora las variables las trabaja de forma correcta. El siguiente paso es analizar las medidas resumen
+
+```{r, echo = FALSE}
+kable(datos_it1 %>% 
+        select(where(is.numeric)) %>% 
+        map_dfr(medidas_resumen))
+```
+
