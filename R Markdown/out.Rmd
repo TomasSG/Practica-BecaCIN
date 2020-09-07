@@ -2,8 +2,9 @@
 title: "Regresión Logística Múltiple"
 author: "Tomás Sánchez Grigioni"
 date: "6/9/2020"
-output: 
-  word_document: default
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -22,16 +23,23 @@ library(purrr)
 
 # Opciones en general
 
-opts_chunk$set(echo = TRUE)
+opts_chunk$set(echo = FALSE, fig.align = "center")
+options(knitr.kable.NA = " ")
 
 # Cargo funciones útiles
 
 source("../R/Utils.R")
+
+# Tema para los gráficos
+
+theme_set(theme_gdocs() + theme(text = element_text(family = "Dubai Medium"),
+                                axis.title = element_text(face = "italic", size = 15),
+                                plot.title = element_text(face = "bold", size = 20, hjust = .5)))
 ```
 
 Para acceder al data set usar este [link](https://www.kaggle.com/c/titanic/data?select=train.csv)
 
-# Exploración de Datos
+## Exploración de Datos
 
 Primero nombramos las variables a usar y sus respectivos significados
 
@@ -81,11 +89,104 @@ datos_it1 <- datos_it0 %>%
 str(datos_it1)
 ```
 
-Ahora las variables las trabaja de forma correcta. El siguiente paso es analizar las medidas resumen
+Ahora las variables las trabaja de forma correcta. El siguiente paso es analizar las medidas resumen, empezamos con **las variables cuantitativas**
 
-```{r, echo = FALSE}
-kable(datos_it1 %>% 
-        select(where(is.numeric)) %>% 
-        map_dfr(medidas_resumen))
+```{r}
+df_tabla <- datos_it1 %>% 
+        select(where(is.numeric))
+lista_tabla <- list(data = df_tabla, nombre_var = names(df_tabla))
+kable(pmap_dfr(lista_tabla, medidas_resumen, remover_na = TRUE), 
+      caption = "Medidas Resumen de Variables Cuantitativas")
+rm(df_tabla, lista_tabla)
 ```
+
+Como se observa, estamos en presencia de 177 NAs en la variable edad. Como en el data set se presentan `r nrow(datos_it1)` observaciones, podemos eleminar todas estas observaciones y quedarnos con el resto.
+
+```{r}
+datos_it2 <- datos_it1 %>% filter(!is.na(edad))
+```
+
+Seguimos con el análisis de **las variables cualitativas**.
+
+```{r}
+df_tabla <- datos_it2 %>% 
+  select(where(is.factor))
+kable(summary(df_tabla), )
+rm(df_tabla)
+```
+ 
+Se observa que
+
+* **nro_cabina** presnta 529 observaciones sin un nivel.
+* **puerto_embarcacion** 2 observaciones sin nivel. 
+
+Sin embargo, no nos vamos a preocupar porque no son variables que nos interesan en nuestro estudio.
+Comenzamos a realizar gráficos para representar las variables. Primero realizaremos gráficos univariados de variables categóricas
+
+```{r}
+g0 <- ggplot(datos_it2, aes(y = ..count.. / sum(..count..))) + scale_y_continuous(labels = label_percent())
+  g1 <- g0 + geom_bar(aes(x = clase), fill = "firebrick", alpha = .6) + ylab("") + xlab("Clase")
+  g2 <- g0 + geom_bar(aes(x = sexo), fill = "darkblue", alpha = .6) + ylab("") + xlab("Sexo")
+  g3 <- g0 + geom_bar(aes(x = sobrevivio), fill = "darkorange", alpha = .6) + ylab("") + xlab("Sobrevivió")
+  
+arrange <- ggarrange(g1, g2, g3, nrow = 3, ncol = 1)
+  
+annotate_figure(arrange, 
+                top = text_grob("Análisis Variables Categóricas", face = "bold", size = 20,
+                                family = "Dubai Medium", hjust = .5))
+```
+
+* En **clase** la mayoría de los pasajeros pertenecen a la tercera clase, siendo estos un caso el 50% del total. Luego, le siguen los pasajeros de la primera clase y por último los de la segunda clase.
+* En **sexo** los pasajeros en su mayoría eran hombres, con un 60% del total, y el resto de mujeres.
+* En **sobrevivio** la mayoría de pasajeros no sobrevivieron, siendo casi un 60% del total.
+
+```{r}
+n <- nrow(datos_it2)
+g0 <- ggplot(datos_it2)
+  
+g1 <- g0 + geom_histogram(aes(precio_ticket, ..density..), bins = calcular_cant_bins(n),
+                            fill = "white", color = "darkblue",  alpha = .4) + 
+  ylab("") +
+  xlab("Precio Ticket") +
+  scale_x_continuous(labels = label_number(prefix = "$"))
+  
+g2 <- g0 + geom_boxplot(aes(precio_ticket), color = "darkblue") +
+  ylab("") +
+  xlab("Precio Ticket") +
+  scale_x_continuous(labels = label_number(prefix = "$")) +
+  theme(axis.text.y = element_blank())
+  
+g3 <- g0 + geom_histogram(aes(edad, ..density..), bins = calcular_cant_bins(n),
+                          color = "firebrick", fill = "white", alpha = .4) +
+  ylab("") +
+  xlab("Edad") 
+
+g4 <- g0 + geom_boxplot(aes(edad), color = "firebrick") +
+  ylab("") +
+  xlab("Edad") +
+  theme(axis.text.y = element_blank())
+  
+arrange <- ggarrange(g1, g2, g3, g4, nrow = 2, ncol = 2)
+annotate_figure(arrange, 
+                top = text_grob("Análisis Variables Cuantitativas", face = "bold", size = 20,
+                                family = "Dubai Medium", hjust = .5))
+```
+
+* En **precio_ticket** se tiene una gran cantidad de observaciones cercanas al cero, y estas disminuyen a medida que aumenta el precio. En el boxplot se visualiza la presencia de varios outliers, siendo el más alejado de estes una observación con un precio mayor a $500.
+* En **edad** la mayoría de observaciones se concentran entre los 20 y 40 años. En el boxplot se visualiza como el 50% central de los datos se encuentra en dico rango de edad. Además, la mediana se encuentra próximo a los 30 años de edad. Por último se visualiza como existen varios outliers.
+
+Volvemos a analizar el boxplot de **precio_ticket** haciendo un zoom en el rango de precios inferior a $100, ya que los outliers distorsionan el gráfico
+
+```{r}
+g0 + geom_boxplot(aes(precio_ticket), color = "darkblue") +
+  ylab("") +
+  xlab("Precio Ticket") +
+  ggtitle("Boxplot de Precio Ticket (zoom)") +
+  theme(axis.text.y = element_blank()) +
+  coord_cartesian(xlim = c(0, 100)) +
+  scale_x_continuous(labels = label_number(prefix = "$"), breaks = seq(0, 100, 10))
+  
+```
+
+* Ahora se logra distinguir como es la distribución de los datos, con un primer cuartil menor a $10, un tercer cuartir mayor a $30 y una mediana cercana a los $15.
 
