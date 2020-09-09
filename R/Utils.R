@@ -14,7 +14,7 @@ ver_variables_con_na <- function(df){
 
 calcular_cant_bins <- function(n) 1 + 3.333 * log10(n)
 
-hacer_barplot_con_dos_cuantitativas <- function(datos, var1, var2){
+hacer_barplot_con_dos_cuantitativas <- function(datos, var1, var2, min = 0, max = 1, paso = 0.1){
   
   datos %>% 
     group_by(!!sym(var2), !!sym(var1)) %>% 
@@ -23,7 +23,7 @@ hacer_barplot_con_dos_cuantitativas <- function(datos, var1, var2){
     ggplot(aes_string(var1, "freq_rel", group = var2, fill = var2)) +
     geom_bar(alpha = .6, stat = "identity", position =  "dodge2") +
     ylab("") +
-    scale_y_continuous(labels = label_percent())
+    scale_y_continuous(labels = label_percent(), breaks = seq(min, max, paso))
     
 }
 

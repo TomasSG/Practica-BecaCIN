@@ -79,7 +79,7 @@ Como se observa a las variables **sobrevivio**, **clase**, **sexo**, **ticket**,
 
 ```{r}
 datos_it1 <- datos_it0 %>% 
-  mutate(sobrevivio = factor(sobrevivio, levels = c(1, 0), labels = c("Sí", "No")), 
+  mutate(sobrevivio = factor(sobrevivio), 
          clase = factor(clase, levels = c(1, 2, 3), labels = c("1ra", "2da", "3ra")), 
          sexo = factor(sexo, levels = c("male", "female"), labels = c("Hombre", "Mujer")),
          nro_cabina = as.factor(nro_cabina), 
@@ -124,7 +124,11 @@ Sin embargo, no nos vamos a preocupar porque no son variables que nos interesan 
 Comenzamos a realizar gráficos para representar las variables. Primero realizaremos gráficos univariados de variables categóricas
 
 ```{r}
-g0 <- ggplot(datos_it2, aes(y = ..count.. / sum(..count..))) + scale_y_continuous(labels = label_percent())
+# Primero convertimos los niveles de sobrevivio para que queden mejor los gráficos
+datos_grafico <- datos_it2 %>% 
+  mutate(sobrevivio = factor(sobrevivio, levels = c(1,0), labels = c("Sí", "No")))
+
+g0 <- ggplot(datos_grafico, aes(y = ..count.. / sum(..count..))) + scale_y_continuous(labels = label_percent())
   g1 <- g0 + geom_bar(aes(x = clase), fill = "firebrick", alpha = .6) + ylab("") + xlab("Clase")
   g2 <- g0 + geom_bar(aes(x = sexo), fill = "darkblue", alpha = .6) + ylab("") + xlab("Sexo")
   g3 <- g0 + geom_bar(aes(x = sobrevivio), fill = "darkorange", alpha = .6) + ylab("") + xlab("Sobrevivió")
@@ -141,8 +145,8 @@ annotate_figure(arrange,
 * En **sobrevivio** la mayoría de pasajeros no sobrevivieron, siendo casi un 60% del total.
 
 ```{r}
-n <- nrow(datos_it2)
-g0 <- ggplot(datos_it2)
+n <- nrow(datos_grafico)
+g0 <- ggplot(datos_grafico)
   
 g1 <- g0 + geom_histogram(aes(precio_ticket, ..density..), bins = calcular_cant_bins(n),
                             fill = "white", color = "darkblue",  alpha = .4) + 
@@ -190,3 +194,183 @@ g0 + geom_boxplot(aes(precio_ticket), color = "darkblue") +
 
 * Ahora se logra distinguir como es la distribución de los datos, con un primer cuartil menor a $10, un tercer cuartir mayor a $30 y una mediana cercana a los $15.
 
+Seguimos con un análisis bivariado de todas las variables vistas contra **sobrevivio**.
+
+```{r}
+g0 <- ggplot(datos_grafico, aes(x = sobrevivio, color = sobrevivio)) + xlab("")
+  
+g1 <- g0 + geom_boxplot(aes(y = precio_ticket)) +
+  ylab("Precio Ticket") +
+  scale_y_continuous(labels = label_number(prefix = "$"))
+  
+g2 <- g0 + geom_boxplot(aes(y = edad)) +
+  ylab("Edad")
+  
+arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+annotate_figure(arrange, 
+                top = text_grob("Variables Cuantitativas vs Sobrevivio", face = "bold", size = 20,
+                                family = "Dubai Medium", hjust = .5))
+
+```
+
+* En **edad** no parece existir diferencia entre ambos grupos.
+* En **precio_ticket** parece exisitr alguna diferencia entre ambos grupos, pero debido a la presencia de outliers se distorsionan los gráficos. Poreso hay que realizar un zoom.
+
+```{r}
+g1 + coord_cartesian(ylim = c(0, 100)) + 
+  ggtitle("Precio Ticket vs Sobrevivió (con zoom)") +
+  theme(legend.position =  "none") +
+  xlab("Sobrevivió")
+```
+
+* Se aprecia como el 75% superior de las datos para el grupo que sí sobrevivio se encuentra por encima del tercer cuartil del grupo que no sobrevivo. Precios de tickets altos se asocian con el grupo que si sobrevivio, y precios bajos con el que no sobrevivio.
+
+
+```{r}
+kable(table(datos_grafico$sobrevivio, datos_grafico$clase))
+kable(table(datos_grafico$sobrevivio, datos_grafico$sexo))
+```
+
+Representamos las tablas de contigencias para ver si existe alguna celda con pocas observaciones, en cuyo caso sería necesario re definir los niveles. En este caso se tiene por lo menos 10 observaciones por celda así que no hay problemas.
+
+```{r, message = FALSE}
+g1 <- hacer_barplot_con_dos_cuantitativas(datos_grafico, "clase", "sobrevivio", max = .7) +
+  xlab("Clase")
+  
+g2 <- hacer_barplot_con_dos_cuantitativas(datos_grafico, "sexo", "sobrevivio", max = .8) +
+  xlab("Sexo")
+
+arrange <- ggarrange(g1, g2, nrow = 1, ncol = 2, common.legend = TRUE, legend = "bottom")
+annotate_figure(arrange, 
+                top = text_grob("Análisis Sobrevivió vs Cualitativas", face = "bold", size = 20,
+                                family = "Dubai Medium", hjust = .5))
+```
+
+* En **clase**:
+  + El grupo que *sí sobrevivio* esta conformado en su mayoría por 1ra clase con un 40%. Luego, siguen los de 3ra clase, y por último los de 2da.
+  + El grupo que *no sobrevivio* esta compuesto en su mayoría por 3ra clase, con cerca del 70%. Luego, siguen los de 2da y 1ra clase.
+* En **sexo**:
+  + El grupo que *sí sobrevivio* esta conformado en su mayoria por mujeres, con casi el 70%.
+  + El grupo que *no sobrevivio* esta conformado por hombres con más del 80%.
+  
+## Rregresión Logística Múltiple
+
+Se va a realizar una regresión logística múltiple para predecir los valores de **sobrevivio**, usando las variables **clase**, **sexo**, **edad** y **precio_ticket** como predictoras.
+
+Primero empezamos planteando el modelo con todas las variables.
+
+```{r}
+modelo_it0 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, data = datos_it2,
+                  family = "binomial")
+summary(modelo_it0)
+print("Resultados del calculo del pseudo R2")
+print(calcular_pseudo_R2(modelo_it0))
+```
+
+Los principales resultados que todas las variables son significativas en el modelo, excepto por **precio_ticket**. Sin embargo, se tiene identificado un outlier para esta varaible (una observación un precio_ticket mayor a $500) por lo que podría estar generando problemas. Posteriormente se realiza el mismo análisis excluyendo esta observación.
+El AIC del modelo es 659.23 y su pseudo R2 es de 0.3289, lo utilizaremos posteriormente para comparar con el resto de modelos
+
+```{r}
+tabla_resumen_modelos <- data.frame(Modelo = "modelo_it0",
+                                    AIC = 659.23,
+                                    R2 = .3289,
+                                    Observacion = "Todas las variables")
+```
+
+Aplicamos el método stepwise para seleccionar variables.
+
+```{r}
+step(modelo_it0, direction = "both")
+```
+
+Como resultado se obtiene el modelo que excluye a **precio_ticket**.
+
+```{r}
+modelo_it1 <- glm(sobrevivio ~ clase + sexo + edad, data = datos_it2,
+                  family = "binomial")
+summary(modelo_it1)
+print("Resultados del calculo del pseudo R2")
+print(calcular_pseudo_R2(modelo_it1))
+```
+
+```{r}
+tabla_resumen_modelos <- tabla_resumen_modelos %>% 
+  add_row(Modelo = "modelo_it1", AIC = 657.58, R2 = 0.3289, Observacion = "Se excluye a precio_ticket")
+```
+
+
+Todas las variables resultan significativas. El pseudor R2 es de .3289 y AIC de 657.28. Se tiene una mejora respecto el AIC del modelo anterior. Interpretamos algunos valores:
+
+* Por cada año que aumenta **edad** los odds de sobrevivir se reducen en un `r round((1 - exp( -0.036985)) * 100, 2)`%, manteniendo el resto de variables constantes.
+* Los odds de sobrevivir de una **mujer** son un `r round((exp(2.522781) -1 ) * 100, 2)`% superiores a los de los hombres.
+* Los odds de sobrevivir de una persona de **segunda clase** son un `r round((1 - exp(-1.309799)) * 100 ,2)`% inferiores a los de una persona de primera clase. 
+* Los odds de sobrevivir de una persona de **tercera clase** son un `r round((1 - exp(-2.580625)) * 100 ,2)`% inferiores a los de una persona de primera clase. 
+
+Ahora que tenemos un modelo elegido buscamos puntos influyentes
+
+```{r}
+puntos_influyentes_outliers <- data.frame(leverage = hatvalues(modelo_it1),
+                                          distancia_cook = cooks.distance(modelo_it1))
+
+puntos_influyentes_outliers <- puntos_influyentes_outliers %>% arrange(-distancia_cook)
+puntos_influyentes_outliers
+```
+
+En principio ninguna de las observaciones presenta una distancia de cook mayor a 1, pero analizamos el caso de la observación 241 por ser el que presenta una distancia de cook mayor y más alejada del resto.
+
+```{r}
+datos_it2[241,]
+```
+
+En principio, la observación no presenta ninguna irregularidad pero vamos a sacarla y volver a ajustar un modelo para ver si resulta en alguna mejoría.
+
+```{r}
+modelo_it2 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, data = datos_it2[-241,],
+                  family = "binomial")
+summary(modelo_it2)
+print("Resultados del calculo del pseudo R2")
+print(calcular_pseudo_R2(modelo_it2))
+```
+
+En principio se volvio a incluir todas las variables. El AIC es de 651.57 y R2 de 0.3362, se presenta una mejoría en el AIC y R2 con respecto a los modelos anteriores.
+
+```{r}
+tabla_resumen_modelos <- tabla_resumen_modelos %>% 
+  add_row(Modelo = "modelo_it2", AIC = 651.57, R2 = 0.3362, Observacion = "Se excluye a observación 241 y se presentan todas las variables")
+```
+
+Volvemos a seleccionar variables usando stepwise
+
+```{r}
+step(modelo_it2, direction = "both")
+```
+
+En el modelo resultante se vuelve a excluir **precio_ticket**
+
+```{r}
+modelo_it3 <- glm(sobrevivio ~ clase + sexo + edad, data = datos_it2[-241,],
+                  family = "binomial")
+summary(modelo_it3)
+print("Resultados del calculo del pseudo R2")
+print(calcular_pseudo_R2(modelo_it3))
+```
+
+El modelo presenta un AIC 649.68 y R2 de 0.3361, siendo mejor que el de todos los modelos previos.
+
+```{r}
+tabla_resumen_modelos <- tabla_resumen_modelos %>% 
+  add_row(Modelo = "modelo_it3", AIC = 649.68, R2 = 0.3361, Observacion = "Se excluye a observación 241 y a precio_ticket")
+```
+
+Por último, volvemos a buscar puntos influyentes.
+
+```{r}
+puntos_influyentes_outliers <- data.frame(leverage = hatvalues(modelo_it3),
+                                          distancia_cook = cooks.distance(modelo_it3))
+
+puntos_influyentes_outliers <- puntos_influyentes_outliers %>% arrange(-distancia_cook)
+puntos_influyentes_outliers
+```
+
+De vuelta observamos que todos los puntos tienen una distancia de cook menor a 1. Como no hay una gran separación en las primeras posiciones, no evaluamos de sacar alguna de las observaciones.
+Ahora buscamos un punto de corte que optimice la sensitividad y la especificidad.
