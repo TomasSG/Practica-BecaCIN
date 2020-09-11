@@ -1,0 +1,661 @@
+---
+title: "Examen EEA (con correcciones)"
+author: "Bodean Emiliano"
+date: "31 de julio de 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+if(!require("readxl")) install.packages("readxl")
+library(readxl)
+if(!require("dplyr")) install.packages("dplyr")
+library(dplyr)
+if(!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+if(!require("GGally")) install.packages("GGally")
+library(GGally)
+if(!require("lmtest")) install.packages("lmtest")
+library(lmtest)
+if(!require("generalhoslem")) install.packages("generalhoslem")
+library(generalhoslem)
+if(!require("kableExtra")) install.packages("kableExtra")
+library(kableExtra)
+if(!require("gridExtra")) install.packages("gridExtra")
+library(gridExtra)
+if(!require("grid")) install.packages("grid")
+library(grid)
+if(!require("broom")) install.packages("broom")
+library(broom)
+if(!require("MLmetrics")) install.packages("MLmetrics")
+library(MLmetrics)
+```
+
+## Problema 1: 
+
+Los datos de la base hipoteca.xls contiene datos de 2380 individuos que solicitaron una hipoteca.
+La variable que nos interesa modelar es “deny”, un indicador de si la solicitud de hipoteca del solicitante ha sido aceptada (deny = 0) o denegada (deny = 1).
+
+Los datos registrados dan información acerca de las siguientes variables:
+
+- pirat: Relación entre gastos e ingresos del individuo.
+- hirat: Relación entre gastos e ingresos de la vivienda.
+- lvrat: Relación préstamo/valor del bien a hipotecar.
+- Unemp: Tasa de desempleo en la industria de los solicitantes.
+- chist: puntaje de crédito al consumo de 1 a 6 (un valor bajo es un buen puntaje)
+- mhist: puntaje de crédito hipotecario de 1 a 4 (un valor bajo es un buen puntaje)
+- Phist: Indicador: ¿Mal historial de crédito público?
+- Insurance: Indicador: ¿Se le negó el seguro hipotecario al individuo?
+- Single: Indicador: ¿El individuo es soltero?
+- Selfemp: Indicador: ¿Es el individuo un trabajador autónomo?
+- Afam: Indicador: ¿Es el individuo afroamericano?
+
+```{r}
+#Carga de datos.
+hipoteca <- read_excel("hipoteca.xlsx")
+
+#Observamos el dataset
+head(hipoteca)
+str(hipoteca)
+
+# Convertimos variables categ a factor
+hipoteca$phist = as.factor(hipoteca$phist)
+hipoteca$insurance = as.factor(hipoteca$insurance)
+hipoteca$selfemp = as.factor(hipoteca$selfemp)
+hipoteca$single = as.factor(hipoteca$single)
+hipoteca$afam = as.factor(hipoteca$afam)
+hipoteca$deny = as.factor(hipoteca$deny)
+hipoteca$chist = as.factor(hipoteca$chist)
+hipoteca$mhist = as.factor(hipoteca$mhist)
+
+```
+
+ * Para las variables categóricas, armamos tablas para visualizar como varían según la variable respuesta.
+
+```{r}
+aux_1 <- cbind(table(hipoteca$deny,hipoteca$phist),table(hipoteca$deny,hipoteca$insurance),
+      table(hipoteca$deny,hipoteca$selfemp),table(hipoteca$deny,hipoteca$single),
+      table(hipoteca$deny,hipoteca$afam))
+aux_1 <- rbind(aux_1,apply(aux_1, 2, sum))
+
+rownames(aux_1)=c("deny=0","deny=1", "Total")
+
+kable(aux_1, 
+      caption = "Tabla de Frecuencia de variables categoricas vs la variable respuesta") %>% 
+  kable_styling(latex_options =c("hold_position")) %>% 
+  add_header_above(c(" ", "phist" = 2, "insurance" = 2, "selfemp" = 2, "single" = 2, 
+                     "afam" = 2))
+
+aux_2 <- cbind(table(hipoteca$deny,hipoteca$chist),table(hipoteca$deny,hipoteca$mhist))
+aux_2 <- rbind(aux_2,apply(aux_2, 2, sum))
+
+rownames(aux_2)=c("deny=0","deny=1", "Total")
+
+kable(aux_2, 
+      caption = "Tabla de Frecuencia de variables categoricas vs la variable respuesta") %>% 
+  kable_styling(latex_options =c("hold_position")) %>% 
+  add_header_above(c(" ", "chist" = 6, "mhist" = 4))
+
+```
+
+Si bien hay algunas casillas chicas, se decide dejar todas las categorías originales sin unificar ya que no parecen ser muchas categorías.
+
+ * Generamos boxplot de las variables continuas.
+
+```{r}
+
+plot_1 <- ggplot(hipoteca,aes(y=pirat))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_2 <- ggplot(hipoteca,aes(y=hirat))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_3 <- ggplot(hipoteca,aes(y=lvrat))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_4 <- ggplot(hipoteca,aes(y=unemp))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+gridExtra::grid.arrange(plot_1, plot_2, plot_3, plot_4, ncol=2, nrow=2)
+
+```
+
+Usamos la función summary para ver los valores de los cuartiles.
+
+```{r}
+
+summary(hipoteca$pirat)
+summary(hipoteca$hirat)
+summary(hipoteca$lvrat)
+summary(hipoteca$unemp)
+
+```
+
+Podemos ver valores atípicos muy altos, la variable lvrat tiene un comportamiento extraño. Filtramos los valores considerados atípicos extremos.
+
+```{r}
+q1_lvrat = summary(hipoteca$lvrat)[2]
+
+q3_lvrat = summary(hipoteca$lvrat)[5]
+
+iqr_lvrat = q3_lvrat - q1_lvrat
+
+hipoteca$lvrat[which(hipoteca$lvrat>(q3_lvrat +3 * iqr_lvrat))]
+
+```
+
+Podemos observar que hay muchos valores atípicos muy alejados del tercer cuartil. Observamos estos registros en particular.
+
+```{r}
+
+kable(hipoteca[which(hipoteca$lvrat>(q3_lvrat +3 * iqr_lvrat)),], 
+      caption = "Registros de Outliers para lvrat") %>%
+  kable_styling(latex_options =c("striped", "scale_down")) %>% 
+  kable_styling(latex_options =c("hold_position"))
+
+
+
+
+kable(table(hipoteca[which(hipoteca$lvrat>(q3_lvrat +3 * iqr_lvrat)),
+                     "deny"]), 
+      caption = "Frecuencia de Deny para los Outliers") %>%
+  kable_styling(latex_options =c("hold_position"))
+
+```
+
+Se opta por eliminar estos 26 registros y volver a analizar las variables.
+
+```{r}
+
+hipoteca_filter <- hipoteca[-which(hipoteca$lvrat>(q3_lvrat +3 * iqr_lvrat)),]
+
+```
+
+Nos queda un dataset con 2354 registros.
+
+ * Boxplot de las variables continuas luego del filtro.
+
+```{r}
+plot_1 <- ggplot(hipoteca_filter,aes(y=pirat))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_2 <- ggplot(hipoteca_filter,aes(y=hirat))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_3 <- ggplot(hipoteca_filter,aes(y=lvrat))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_4 <- ggplot(hipoteca_filter,aes(y=unemp))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+gridExtra::grid.arrange(plot_1, plot_2, plot_3, plot_4, ncol=2, nrow=2)
+
+```
+
+ * Tablas de frecuencia de las variables categóricas luego del filtro.
+
+```{r}
+aux_1 <- cbind(table(hipoteca_filter$deny,hipoteca_filter$phist),
+               table(hipoteca_filter$deny,hipoteca_filter$insurance),
+               table(hipoteca_filter$deny,hipoteca_filter$selfemp),
+               table(hipoteca_filter$deny,hipoteca_filter$single),
+               table(hipoteca_filter$deny,hipoteca_filter$afam))
+aux_1 <- rbind(aux_1,apply(aux_1, 2, sum))
+rownames(aux_1)=c("deny=0","deny=1", "Total")
+kable(aux_1, 
+      caption = "Tabla de Frecuencia de variables categóricas vs la variable respuesta") %>% 
+  kable_styling(latex_options =c("hold_position")) %>% 
+  add_header_above(c(" ", "phist" = 2, "insurance" = 2, "selfemp" = 2, "single" = 2, 
+                     "afam" = 2))
+
+aux_2 <- cbind(table(hipoteca_filter$deny,hipoteca_filter$chist),
+               table(hipoteca_filter$deny,hipoteca_filter$mhist))
+aux_2 <- rbind(aux_2,apply(aux_2, 2, sum))
+rownames(aux_2)=c("deny=0","deny=1", "Total")
+kable(aux_2, 
+      caption = "Tabla de Frecuencia de variables categóricas vs la variable respuesta") %>% 
+  kable_styling(latex_options =c("hold_position")) %>% 
+  add_header_above(c(" ", "chist" = 6, "mhist" = 4))
+```
+
+## 1.	Ajustar un modelo de regresión logística para el conjunto de datos que permita explicar y predecir el otorgamiento de hipoteca a partir de la información disponible. Para esto, antes que nada, separar los datos en conjuntos de entrenamiento y validación en forma aleatoria en 70/30. Indique que cantidad de casos quedaron para cada ambiente.
+
+```{r}
+
+#separo entrenamiento y validación
+set.seed(2)
+entreno=sample(seq(length(hipoteca_filter$deny)),length(hipoteca_filter$deny)*0.70,
+               replace=FALSE) 
+train=hipoteca_filter[entreno,]
+test<-hipoteca_filter[-entreno,]
+
+```
+
+Nos quedan 707 casos para test y 1647 casos para entrenamiento
+
+ * Se genera el modelo completo introduciendo todas las variables como predictores.
+
+```{r}
+modelo_completo<-glm(deny~pirat+hirat+lvrat+unemp+chist+mhist+phist+insurance+
+                       selfemp+single+afam, data = train, family = binomial)
+summary(modelo_completo)
+
+```
+## 2.	Analice las variables disponibles para incluirlas de modo adecuado.
+
+En el modelo ya podemos ver que hay tres variables (hirat, unemp, mhist y single) que no son significativas con un nivel de 0,05. 
+
+* Genero un modelo sacando las variables menos significativas
+
+```{r}
+
+modelo_2<-glm(deny~pirat+lvrat+chist+phist+insurance+selfemp+afam, data = train ,
+                     family = binomial)
+summary(modelo_2)
+
+
+```
+
+Comparando el AIC de los modelos podemos ver que el segundo modelo es mejor, AIC: 892.82 vs AIC: 886.78. 
+
+## 3.	Considere varios modelos posibles y compárelos adecuadamente en el conjunto de entrenamiento:
+-	Un modelo con todas las variables disponibles
+-	Un modelo con todas las variables que resultaron significativas al 5%
+-	Un modelo seleccionando con un método por pasos
+-	Algún modelo elegido según interés del problema.
+
+Utilizamos la función Step para seleccionar la mejor combinación de variables comparando por AIC, aplicando el método en ambas direcciones.
+
+```{r}
+step(modelo_completo, direction = "both")
+```
+
+Obtuvimos el siguiente modelo con un AIC menor a los dos anteriores, AIC: 886.
+
+glm(formula = deny ~ pirat + lvrat + chist + phist + insurance + 
+              selfemp + single + afam, family = binomial, data = train)
+    
+```{r}
+
+modelo_3 <- glm(formula = deny ~ pirat + lvrat + chist + phist + insurance +
+                selfemp + single + afam, family = binomial, data = train)
+summary(modelo_3)
+```
+
+ * Algún modelo elegido según interés del problema.
+
+Se prueba hacer un modelo sin la variable Afam (¿Es el individuo afroamericano?), ya que sin haber realizado el análisis anterior parecía que la variable no tenía relación con el interés del problema.
+
+```{r}
+modelo_4<-glm(deny~pirat+hirat+lvrat+unemp+chist+mhist+phist+insurance+
+                       selfemp+single, data = train, family = binomial)
+summary(modelo_4)
+```
+
+El valor de AIC nos da mayor que los anteriores, esto es correcto porque eliminamos una variable significativa.
+
+ * Comparación de modelos basada en rankings.
+
+```{r warning=FALSE}
+
+aux_5 <- glance(modelo_completo) %>% 
+  dplyr::select(AIC, BIC)
+aux_5 <- rbind(aux_5, glance(modelo_2) %>%
+  dplyr::select(AIC, BIC))
+aux_5 <- rbind(aux_5, glance(modelo_3) %>%
+  dplyr::select(AIC, BIC))
+aux_5 <- rbind(aux_5, glance(modelo_4) %>%
+  dplyr::select(AIC, BIC))
+
+rownames(aux_5) <- c("Modelo Completo", "Modelo 2", "Modelo 3", "Modelo 4")
+
+kable(aux_5, caption = "Comparación basada en rankings") %>% 
+  kable_styling(latex_options =c("hold_position"))
+
+```
+
+En la selección de modelo basado en AIC, nos da que el mejor es el modelo 3. Pero basado en BIC nos da que el mejor modelo es modelo 2, esto puede ser porque AIC tiende a favorecer a los modelos más complejos (modelo 3 posee una variable más que el modelo 2). 
+
+## 4.	Para el modelo elegido en el punto anterior: 
+
+### a)	Encuentre intervalos de confianza de exp beta para los coeficientes.  ¿Los intervalos de confianza de e son simétricos, o aproximadamente simétricos?
+
+
+```{r}
+# Escribo los valores del exponente Beta
+exp(modelo_3$coefficients)
+
+```
+
+```{r message=FALSE}
+#IC para los ODDs=exp(betas): odds ratios e Intervalos de Confianza al 95%
+exp(cbind(OR = coef(modelo_3), confint(modelo_3)))
+
+```
+
+Vemos que las variables chist3 y single incluye al 1 en el intervalo de confianza de su coeficiente, son las dos variables que tenían el p-valor mayor a 0.05 (0.067326 y 0.094931).
+
+Los intervalos de confianza no son simétricos.
+
+### b)	¿Son todas las variables significativas para el modelo? ¿Es coherente con lo observado en el ítem anterior?
+
+Como se observó en el punto anterior, las variables seleccionando con el método por pasos no son todas
+significativas al 95%. Continuamos el análisis para luego comparar los modelos según su capacidad predictiva. 
+
+### c)	Considere un test de bondad de ajuste: ¿qué conclusión se obtiene?
+
+Generamos el test de H-L de bondad de ajuste, este test tiene las siguientes hipótesis.
+ 
+|Test HL                       |
+|------------------------------|
+|H0: el modelo ajusta bien     |
+|H1: el modelo NO ajusta bien  |
+
+
+```{r}
+## BONDAD DE AJUSTE
+logitgof(train$deny, fitted(modelo_3))
+
+```
+
+Nos da un p-valor > 0.05, por esto no rechaza H0. El modelo ajusta bien y se considera significativo.
+
+
+### d)	Elija uno de los coeficientes del modelo elegido e interprételo en términos de los odds.
+
+Si por ejemplo tomamos el indicador de que el individuo es un trabajador autónomo, selfemp = 1.866513, podemos decir que un cambio a "yes" en selfemp aumenta un 86,65% el Odd (aumenta la chance de ser aceptada la hipoteca respecto a no ser aceptada)
+
+
+### e)	Calcule valores de pseudos R2 
+
+```{r}
+#para sacar pseudos R2- MacFadden
+nullmod <- glm(deny~1, data = train, family="binomial")
+R2_completo<-1-logLik(modelo_completo)/logLik(nullmod)
+R2_2<-1-logLik(modelo_2)/logLik(nullmod)
+R2_3<-1-logLik(modelo_3)/logLik(nullmod)
+R2_4<-1-logLik(modelo_4)/logLik(nullmod)
+
+aux_3 <- rbind(R2_completo, R2_2, R2_3, R2_4)
+rownames(aux_3) <- c("Modelo Completo", "Modelo 2", "Modelo 3", "Modeo 4")
+
+kable(aux_3, caption = "Pseudo R2 - McFadden") %>% 
+  kable_styling(latex_options =c("hold_position"))
+
+```
+
+En los cuatro modelos obtuvimos valores de pseudo R2 cercanos a 0.28. Es levemente superior para el modelo completo (0.289), pero no hay gran diferencia.
+
+### f)	Estudie la existencia de puntos influyentes y outliers
+
+Vemos los residuos de Pearson y de deviancias para ver puntos de mal ajuste.
+
+```{r}
+#para calcular residuales
+e <- residuals(modelo_3, "response")  #residuales comunes: y-pihat
+rp <- residuals(modelo_3, "pearson") #de Pearson
+dev <- residuals(modelo_3, "deviance") #res de Devianza
+
+```
+
+Una observación puede ser considerada anormal si el residual de deviancia es mayor que 2  en valor absoluto.
+
+Contamos la cantidad de registro con el residual de deviancia mayor que 2.
+
+```{r}
+
+length(which(abs(dev) > 2)) 
+
+```
+
+ * Leverage: Para detectar observaciones outliers.
+
+```{r}
+h <- hatvalues(modelo_3) #leverages
+plot(modelo_3)
+predis<-modelo_2$fitted
+plot(predis,h)
+```
+
+Del grafico vemos que no hay puntos con h > 0.15, no se detectan puntos outliers con Leverage.
+
+ * Observamos distancia de Cook para detectar puntos influyentes.
+
+```{r}
+p <- 8 #numero de predictores
+D <- (rp^2*h)/(p*(1-h)^2) # Cook's Distance
+plot(train$deny,D)
+which(D > 0.03) #casos con D mayor a 0.03 
+
+```
+
+Podemos observar del grafico los puntos que tienen un D > 0.03.
+
+### g)	Calcule AUC y grafique la curva ROC en entrenamiento y validación
+
+```{r message=FALSE, warning=FALSE}
+library(pROC)
+roc.mod<-roc(train$deny,fitted.values(modelo_3))
+#attributes(roc.mod)
+plot(roc.mod)
+```
+Calculamos el área bajo la curva (AUC).
+
+```{r message=FALSE, warning=FALSE}
+p.pred<-predict(modelo_3,test,type="response") 
+auc.rl<-roc(test$deny, p.pred)$auc #calcula directamente auc 
+auc.rl
+
+```
+
+El valor de area bajo la curva obtenido es bueno.
+
+### h)	Encuentre la tabla de clasificación con un punto de corte de 0.5. ¿cuál es el porcentaje de casos bien clasificados? 
+
+```{r}
+library(vcd)
+predicciones <- ifelse(test = modelo_3$fitted.values > 0.5, yes = 1, no = 0)
+matriz_confusion <- table(modelo_3$model$deny, predicciones,
+                         dnn = c("observaciones", "predicciones"))
+#matriz_confusion
+kable(matriz_confusion, caption = "Matriz de Confusión") %>% 
+  kable_styling(latex_options =c("hold_position")) %>% 
+  add_header_above(c("observaciones", "predicciones" = 2))
+
+mosaic(matriz_confusion, shade = T, colorize = T,
+      gp = gpar(fill = matrix(c("green3", "red2", "red2", "green3"), 2, 2)))
+
+accu <- sum(diag(matriz_confusion))/sum(matriz_confusion)
+sensitividad<-matriz_confusion[2,2]/sum(matriz_confusion[2,])
+especificidad<-matriz_confusion[1,1]/sum(matriz_confusion[1,])
+
+aux_4 <- rbind(accu, sensitividad, especificidad,
+               F1_Score(modelo_3$model$deny, predicciones, positive = NULL))
+rownames(aux_4) <- c("Accurace","Sensibilidad","Especificidad","Fmeasure")
+kable(aux_4, caption = "Capacidad predictiva")%>% 
+  kable_styling(latex_options =c("hold_position"))
+
+```
+
+Tenemos un 90,8% de los casos de entrenamiento bien clasificados. También podemos observar que su sensibilidad es baja, 
+
+### i)	¿Puede mejorar la clasificación variando el punto de corte? Proponga un punto de corte que maximice, aproximadamente, sensitividad y especificidad.
+
+Probamos con otros puntos de corte. Generamos una tabla con puntos de corte entre 0.1 y 0.9 con pasos de 0.01, calculando las métricas Accurace, Sensibilidad, Especificidad y F con beta igual a 1.
+Luego hacemos una tabla con los 10 mejores resultados ordenando por métrica F.
+
+```{r}
+predicciones <- ifelse(test = modelo_3$fitted.values > 0.1, yes = 1, no = 0)
+matriz_confusion <- table(modelo_3$model$deny, predicciones)
+accu <- sum(diag(matriz_confusion))/sum(matriz_confusion)
+sensitividad<-matriz_confusion[2,2]/sum(matriz_confusion[2,])
+especificidad<-matriz_confusion[1,1]/sum(matriz_confusion[1,])
+
+aux_6 <- cbind(0.1,accu, sensitividad, especificidad,
+               F1_Score(modelo_3$model$deny, predicciones, positive = NULL))
+colnames(aux_6) <- c("Punto de Corte","Accurace","Sensibilidad",
+                     "Especificidad","Fmeasure")
+
+for(i in  seq(0.11,0.9,0.01)){
+  predicciones <- ifelse(test = modelo_3$fitted.values > i, yes = 1, no = 0)
+  matriz_confusion <- table(modelo_3$model$deny, predicciones)
+  accu <- sum(diag(matriz_confusion))/sum(matriz_confusion)
+  sensitividad<-matriz_confusion[2,2]/sum(matriz_confusion[2,])
+  especificidad<-matriz_confusion[1,1]/sum(matriz_confusion[1,])
+  aux_6 <- rbind(aux_6,cbind(i,accu, sensitividad,
+                             especificidad,
+                             F1_Score(modelo_3$model$deny, predicciones, 
+                                      positive = NULL)))
+}
+
+kable(head(aux_6[order(aux_6[,5], decreasing = TRUE),],10), 
+      caption = "Mejores Puntos de Corte")%>% 
+  kable_styling(latex_options =c("hold_position"))
+
+
+```
+
+Vemos que cambiando el punto de corte a 0.42 podemos obtener una precisión de 91%, una sensibilidad del 39% y una especificidad del 98%.
+
+Si el problema requiere disponer de un test altamente sensible, resulta más útil observar los valores de sensibilidad determinados por diferentes puntos de corte, y optar por aquel que determine un valor mayor. En nuestro caso optamos con seleccionar el punto de corte con la métrica F que nos da una media armónica entre precisión y sensibilidad. 
+
+### j)	Según el punto de corte dado en el ítem anterior, ¿cómo fue clasificado el caso Nº 100? ¿Fue clasificado correctamente? ¿Con qué probabilidad fue clasificado?
+
+```{r}
+#Como fue clasificado
+ifelse(test = modelo_3$fitted.values[100] > 0.42, yes = "SI", no = "NO")
+
+#como era en verdad
+ifelse(test = modelo_3$model$deny[100] == 1, yes = "SI", no = "NO")
+
+#probabilidad
+modelo_3$fitted.values[100]
+
+```
+
+El punto numero 100 fue correctamente clasificado como "no", la solicitud de hipoteca del solicitante ha sido aceptada (deny = 0).
+
+Ese punto tenía una probabilidad de 0.10 de ser "Si".
+
+
+### 5.	Finalmente, evalúe la capacidad predictiva de todos los modelos considerados en el punto 3. ¿Considera que, según este criterio, alguno es mejor que el modelo elegido?   
+```{r message=FALSE}
+### Modelo Completo
+#tabla de clasificacion y accuracy para modelo_completo
+predicompleto<-predict(modelo_completo,newdata=test,type="response")
+prediccion_c <- ifelse(predicompleto >= 0.42, 1, 0) #fui cambiando a mano
+tabla.clasif_c <- table(test$deny, prediccion_c)
+tabla.clasif_c
+accu_c <- sum(diag(tabla.clasif_c))/sum(tabla.clasif_c)
+## Codigo para Sensibilidad y Especificidad:
+sensitividad_c<-tabla.clasif_c[2,2]/sum(tabla.clasif_c[2,])
+especificidad_c<-tabla.clasif_c[1,1]/sum(tabla.clasif_c[1,])
+## calculo de AUC
+p.pred_c<-predict(modelo_completo,test,type="response") 
+auc.rl_c<-roc(test$deny, p.pred_c)$auc #calcula directamente auc 
+
+### Modelo 2
+#tabla de clasificacion y accuracy para modelo_2
+predi2<-predict(modelo_2,newdata=test,type="response")
+prediccion_2 <- ifelse(predi2 >= 0.42, 1, 0) #fui cambiando a mano
+tabla.clasif_2 <- table(test$deny, prediccion_2)
+tabla.clasif_2
+accu_2 <- sum(diag(tabla.clasif_2))/sum(tabla.clasif_2)
+## Codigo para Sensibilidad y Especificidad:
+sensitividad_2<-tabla.clasif_2[2,2]/sum(tabla.clasif_2[2,])
+especificidad_2<-tabla.clasif_2[1,1]/sum(tabla.clasif_2[1,])
+## calculo de AUC
+p.pred_2<-predict(modelo_2,test,type="response") 
+auc.rl_2<-roc(test$deny, p.pred_2)$auc #calcula directamente auc 
+
+### Modelo 3
+#tabla de clasificacion y accuracy para modelo_3
+predi3<-predict(modelo_3,newdata=test,type="response")
+prediccion3 <- ifelse(predi3 >= 0.42, 1, 0) #fui cambiando a mano
+tabla.clasif_3 <- table(test$deny, prediccion3)
+tabla.clasif_3
+accu_3 <- sum(diag(tabla.clasif_3))/sum(tabla.clasif_3)
+## Codigo para Sensibilidad y Especificidad:
+sensitividad_3<-tabla.clasif_3[2,2]/sum(tabla.clasif_3[2,])
+especificidad_3<-tabla.clasif_3[1,1]/sum(tabla.clasif_3[1,])
+## calculo de AUC
+p.pred_3<-predict(modelo_3,test,type="response") 
+auc.rl_3<-roc(test$deny, p.pred_3)$auc #calcula directamente auc 
+
+### Modelo 4
+#tabla de clasificacion y accuracy para modelo_4
+predi4<-predict(modelo_4,newdata=test,type="response")
+prediccion4 <- ifelse(predi4 >= 0.42, 1, 0) #fui cambiando a mano
+tabla.clasif_4 <- table(test$deny, prediccion4)
+tabla.clasif_4
+accu_4 <- sum(diag(tabla.clasif_4))/sum(tabla.clasif_4)
+## Codigo para Sensibilidad y Especificidad:
+sensitividad_4<-tabla.clasif_4[2,2]/sum(tabla.clasif_4[2,])
+especificidad_4<-tabla.clasif_4[1,1]/sum(tabla.clasif_4[1,])
+## calculo de AUC
+p.pred_4<-predict(modelo_4,test,type="response") 
+auc.rl_4<-roc(test$deny, p.pred_4)$auc #calcula directamente auc 
+
+resul1 <- cbind(accu_c, sensitividad_c, especificidad_c, auc.rl_c)
+colnames(resul1) <- c("Accurace","Sensibilidad","Especificidad","AUC")
+resul2 <- cbind(accu_2, sensitividad_2, especificidad_2, auc.rl_2)
+colnames(resul2) <- c("Accurace","Sensibilidad","Especificidad","AUC")
+resul3 <- cbind(accu_3, sensitividad_3, especificidad_3, auc.rl_3)
+colnames(resul3) <- c("Accurace","Sensibilidad","Especificidad","AUC")
+resul4 <- cbind(accu_4, sensitividad_4, especificidad_4, auc.rl_4)
+colnames(resul4) <- c("Accurace","Sensibilidad","Especificidad","AUC")
+result <- rbind(resul1,resul2,resul3,resul4)
+rownames(result) <- c("Modelo Completo","Modelo 2","Modelo 3","Modelo 4")
+
+kable(result, caption = "Capacidad predictiva - Comparación") %>% 
+  kable_styling(latex_options =c("hold_position"))
+
+```
+
+Comparando los valores de AUC de cada modelo, nos da que le mejor es el modelo 3, igual que en la selección de modelo por AIC. Se observa que el porcentaje en test dio más alto que en train, esto es poco común.
+
+Se aprecia que el modelo 3 pudo identificar correctamente a 646 casos sobre los 707 casos de test.
+
+Sería bueno repetir la prueba con otra muestra aleatoria train y test para ver si se mantienen los mismos valores de las métricas. También se podría emplear otro método mejor como Cross Validation.
+
+----
+
+## Problema 2: 
+
+Indique si es Verdadera o Falsa cada una de las siguientes afirmaciones.
+
+ - 1	Un valor de Cp de Mallows es adecuado para elegir un modelo si toma un valor cerca de 1.	FALSA
+ - 2	El modelo de regresión logística supone los errores Normales, independientes y de igual varianza.	FALSA
+ - 3	Si X es una variable categórica que toma 4 valores posibles, se debe introducir al modelo creando 4 variables dummies.	FALSA
+ - 4	En un modelo de regresión lineal, la prueba de Hosmer y Lemeshow se utiliza para ver si el ajuste del modelo es bueno.	FALSA
+ - 5	En un modelo de Reg. Logística, si exp(beta_i) = 3, esto indica que un aumento unitario en la variable Xi provoca en la variable respuesta Y un aumento al triple.	FALSA
+
+----
+
+## Problema 3: 
+
+Responda brevemente los siguientes ítems:
+
+ - a)	Explique una forma de detectar la multicolinealidad en un modelo de regresión múltiple. ¿Qué modelos alternativos pueden usarse para tratar con este problema? 
+
+Para buscar indicios de multicolinealidad, se puede utilizar la métrica Variance Inflation Factor (VIf). Un VIF con valores mayores a 10 indica colinealidad entre variables.
+
+Métodos para remediar el problema de multicolinealidad:
+
+ - Recolección de datos adicionales
+ - Reespecificar el modelo (por ej eliminar variables)
+ - Regresión Ridge
+ - Regresión en componentes principales
+ - PLSR (regresión de mínimos cuadrados parciales)
+
+El problema de multicolinealidad también está relacionado con los métodos de selección de variables y estos pueden ser otra manera de resolver el problema de multicolinealidad. 
+
+
+ - b)	Explique otros modelos que podrían aplicarse para clasificar en el Problema 1.
+
+Para el problema 1 se podría utilizar máquina de soporte vectorial (SMV) o Clasificación con Redes Bayesianas.
+
+En SMV se buscan hiperplanos que separen los datos de la mejor manera posible.
+
+En Clasificación con Redes Bayesianas, se utilizan probabilidades condicionales y se aplica el teorema de Bayes
+
+
+
+
+

@@ -67,12 +67,12 @@ obtener_resultados_matriz_confusion <- function(valor_corte = .5,
   
   # Extraigo la información que me interesa
   
-  sensitividad <- matriz$byClass["Sensitivity"]
+  sensibilidad <- matriz$byClass["Sensitivity"]
   especificidad <- matriz$byClass["Specificity"]
   accuracy <- matriz$overall["Accuracy"]
   
   df_resultado <- data.frame("valor_corte" = valor_corte,
-                             "sensitividad" = sensitividad,
+                             "sensibilidad" = sensibilidad,
                              "especificidad" = especificidad,
                              "accuracy" = accuracy,
                              row.names = NULL)

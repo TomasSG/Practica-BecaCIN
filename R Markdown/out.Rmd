@@ -20,6 +20,7 @@ library(scales)
 library(extrafont)
 library(knitr)
 library(purrr)
+library(pROC) #roc y auc
 
 # Opciones en general
 
@@ -306,14 +307,58 @@ Todas las variables resultan significativas. El pseudor R2 es de .3289 y AIC de 
 * Los odds de sobrevivir de una persona de **segunda clase** son un `r round((1 - exp(-1.309799)) * 100 ,2)`% inferiores a los de una persona de primera clase. 
 * Los odds de sobrevivir de una persona de **tercera clase** son un `r round((1 - exp(-2.580625)) * 100 ,2)`% inferiores a los de una persona de primera clase. 
 
-Ahora que tenemos un modelo elegido buscamos puntos influyentes
+Ahora que tenemos un modelo elegido buscamos puntos influyentes, outliers y puntos con mal ajuste.
+
+* **Puntos con Mal Ajuste**
 
 ```{r}
-puntos_influyentes_outliers <- data.frame(leverage = hatvalues(modelo_it1),
-                                          distancia_cook = cooks.distance(modelo_it1))
+df_residuos <- data.frame(d_residuos = residuals(modelo_it1, type = "deviance"),
+                          residuos = modelo_it1$residuals,
+                          valores_ajustados = modelo_it1$fitted.values)
 
-puntos_influyentes_outliers <- puntos_influyentes_outliers %>% arrange(-distancia_cook)
-puntos_influyentes_outliers
+
+ggplot(df_residuos, aes(valores_ajustados, d_residuos)) +
+  geom_point() +
+  geom_hline(yintercept = c(2, -2), color = "firebrick", size = 1.3, linetype = 2) +
+  ylab("Residuos de Deviancia") +
+  xlab("Valores Ajustados") +
+  ggtitle("Análisis de Residuos") 
+```
+
+Se observan varios puntos con mal ajuste, los mostramos
+
+```{r}
+ indices <- which((abs(df_residuos$d_residuos) >= 2))
+datos_it2[indices, ]
+```
+
+En total existen `r nrow(datos_it2[indices,])` observaciones con mal ajuste.
+
+```{r}
+rm(indices,df_residuos)
+```
+
+* **Outliers**
+
+```{r}
+puntos_outliers <- data.frame(leverage = hatvalues(modelo_it1)) %>% arrange(-leverage)
+puntos_outliers
+```
+
+Ningun valor de leverage es mayor a uno, ni ocurre que existan valores más alejados del resto.
+
+```{r}
+rm(puntos_outliers)
+```
+
+* **Puntos Influyentes**
+
+```{r}
+puntos_influyentes <- data.frame(distancia_cook = cooks.distance(modelo_it1))
+
+puntos_influyentes <- puntos_influyentes %>% arrange(-distancia_cook)
+puntos_influyentes
+rm(puntos_influyentes)
 ```
 
 En principio ninguna de las observaciones presenta una distancia de cook mayor a 1, pero analizamos el caso de la observación 241 por ser el que presenta una distancia de cook mayor y más alejada del resto.
@@ -322,10 +367,12 @@ En principio ninguna de las observaciones presenta una distancia de cook mayor a
 datos_it2[241,]
 ```
 
-En principio, la observación no presenta ninguna irregularidad pero vamos a sacarla y volver a ajustar un modelo para ver si resulta en alguna mejoría.
+La observación no presenta ninguna irregularidad pero vamos a sacarla y volver a ajustar un modelo para ver si resulta en alguna mejoría.
 
 ```{r}
-modelo_it2 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, data = datos_it2[-241,],
+datos_it3 <- datos_it2[-241,]
+
+modelo_it2 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, data = datos_it3,
                   family = "binomial")
 summary(modelo_it2)
 print("Resultados del calculo del pseudo R2")
@@ -348,7 +395,7 @@ step(modelo_it2, direction = "both")
 En el modelo resultante se vuelve a excluir **precio_ticket**
 
 ```{r}
-modelo_it3 <- glm(sobrevivio ~ clase + sexo + edad, data = datos_it2[-241,],
+modelo_it3 <- glm(sobrevivio ~ clase + sexo + edad, data = datos_it3,
                   family = "binomial")
 summary(modelo_it3)
 print("Resultados del calculo del pseudo R2")
@@ -365,12 +412,104 @@ tabla_resumen_modelos <- tabla_resumen_modelos %>%
 Por último, volvemos a buscar puntos influyentes.
 
 ```{r}
-puntos_influyentes_outliers <- data.frame(leverage = hatvalues(modelo_it3),
-                                          distancia_cook = cooks.distance(modelo_it3))
+puntos_influyentes <- data.frame(distancia_cook = cooks.distance(modelo_it3))
 
-puntos_influyentes_outliers <- puntos_influyentes_outliers %>% arrange(-distancia_cook)
-puntos_influyentes_outliers
+puntos_influyentes <- puntos_influyentes %>% arrange(-distancia_cook)
+puntos_influyentes
+rm(puntos_influyentes)
 ```
 
-De vuelta observamos que todos los puntos tienen una distancia de cook menor a 1. Como no hay una gran separación en las primeras posiciones, no evaluamos de sacar alguna de las observaciones.
+De vuelta observamos que todos los puntos tienen una distancia de cook menor a 1. Como no hay observaciones que se encuentren más alejadas que el resto seguimos con el analizis.
 Ahora buscamos un punto de corte que optimice la sensitividad y la especificidad.
+
+```{r}
+df_valores_corte <- obtener_resultados_todos_posibles_valores_criticos(
+  valores_reales = datos_it3$sobrevivio,
+  probabilidades_estimadas = modelo_it3$fitted.values)
+
+df_grafico <- data.frame(valor_corte = df_valores_corte$valor_corte,
+                         valor =df_valores_corte$sensibilidad,
+                         curva = "Sensibilidad")
+
+df_grafico <- rbind(df_grafico, data.frame(valor_corte = df_valores_corte$valor_corte,
+                                           valor =df_valores_corte$especificidad,
+                                           curva = "Especificidad"))
+
+ggplot(mapping = aes(x = valor_corte)) +
+  geom_line(df_grafico %>% filter(curva == "Sensibilidad"), mapping =  aes(y = valor, color = curva, 
+                                                      linetype = curva), size = 1.3) +
+  geom_line(df_grafico %>% filter(curva == "Especificidad"), mapping =  aes(y = valor, color = curva, 
+                                                      linetype = curva), size = 1.3) +
+  xlab("Valor de Corte") +
+  ylab("") + 
+  ggtitle("Análisis de Posibles Valores de Corte") +
+  scale_y_continuous(labels = label_percent()) +
+  scale_x_continuous(breaks = seq(0, 1, .1)) 
+
+rm(df_grafico)
+
+```
+
+El valor de corte que macimiza la **sensibilidad** y la **especificidad** se encuentra en torno a 0.4.
+
+```{r}
+df_valores_corte %>% filter(abs(sensibilidad - especificidad) <= 0.01)
+```
+
+Los dos posibles puntos de cortes son 0.42 y 0.41, nos quedamos con aquel que maximize la accuracy. Por esto elegimos a 0.42 como punto de corte optimo.
+
+```{r}
+valor_corte <- 0.42
+```
+
+Generamos la matriz de confusión con este valor de corte
+
+```{r}
+predicciones <- ifelse(modelo_it3$fitted.values >= valor_corte, "Sí", "No")
+predicciones_factor <- factor(predicciones, levels = c("Sí", "No"))
+
+observaciones_reales_factor <- factor(datos_it3$sobrevivio, levels = c(1, 0), labels = c("Sí", "No"))
+
+confusionMatrix(predicciones_factor, observaciones_reales_factor)
+
+rm(predicciones, predicciones_factor, observaciones_reales_factor, valor_corte)
+```
+
+Dibujamos las curvas ROC de los distintos modelos
+
+```{r, message = FALSE}
+roc0 <- roc(datos_it2$sobrevivio, modelo_it0$fitted.values)
+roc1 <- roc(datos_it2$sobrevivio, modelo_it1$fitted.values)
+roc2 <- roc(datos_it3$sobrevivio, modelo_it2$fitted.values)
+roc3 <- roc(datos_it3$sobrevivio, modelo_it3$fitted.values)
+
+par(pty = "s")
+roc(datos_it2$sobrevivio, modelo_it0$fitted.values, legacy.axes = TRUE, plot = TRUE,
+            percent = TRUE, col = "#fec44f", print.auc = TRUE, lwd = 2)
+plot.roc(datos_it2$sobrevivio, modelo_it1$fitted.values, legacy.axes = TRUE, percent = TRUE, 
+         col = "#2b8cbe", print.auc = TRUE, lwd = 2, add = TRUE, print.auc.y = 40)
+plot.roc(datos_it3$sobrevivio, modelo_it2$fitted.values, legacy.axes = TRUE, percent = TRUE,
+         col = "#31a354", print.auc = TRUE, lwd = 2, add = TRUE, print.auc.y = 30)
+plot.roc(datos_it3$sobrevivio, modelo_it3$fitted.values, legacy.axes = TRUE, percent = TRUE, 
+         col = "#756bb1", print.auc = TRUE, lwd = 2, add = TRUE, print.auc.y = 20)
+par(xpd = TRUE)
+legend(-3, 50, legend = c("Modelo 0", "Modelo 1", "Modelo 2", "Modelo 3"), 
+       col = c("#fec44f", "#2b8cbe", "#31a354", "#756bb1"), lwd = 2)
+par(pty = "m")
+
+```
+
+Los gráficos de las distintas curvas ROC no se logran diferenciar porque se superponene. Indicando que todos los modelos tienen una capacidad predictiva similar.
+
+Por último, mostramos los valores comparativos entre todos los modelos explorados
+
+```{r}
+
+tabla_resumen_modelos <- tabla_resumen_modelos %>% 
+  mutate(AUC = c(auc(roc0), auc(roc1), auc(roc2), auc(roc3)))
+
+kable(tabla_resumen_modelos)
+
+rm(roc0, roc1, roc2, roc3, tabla_resumen_modelos)
+```
+

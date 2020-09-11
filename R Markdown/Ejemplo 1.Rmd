@@ -1,0 +1,514 @@
+---
+title: "Trabajo Práctico: Regresión Lineal"
+author: "xx"
+date: "10 de junio de 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(kableExtra)
+library(GGally)
+library(lmtest)
+library(broom)
+library(leaps)
+library(car)
+library(MLmetrics)
+```
+
+## Enunciado del Problema:
+
+El conjunto de datos ‘Telefonía 2019’ tiene datos de clientes que contrataron un servicio de telefonía fija. 
+Nos contrataron para analizar si es posible estimar adecuadamente el ingreso del grupo familiar al que se presta el servicio, a partir de las variables disponibles. Esto permitiría a la empresa de telefonía, gran accionista de cierto banco, realizar una campaña entre potenciales clientes.
+El objetivo final de este trabajo es entregar un modelo que sea capaz de realizar la predicción del ingreso.
+
+### 0. Carga de datos
+
+```{r}
+
+Telefonia_2019 <- read_excel("TP regresion/Telefonia 2019.xls")
+kable(head(Telefonia_2019))
+
+```
+
+
+### 1.	Realice previamente los análisis univariados/bivariados que crea conveniente.
+
+```{r}
+summary(Telefonia_2019)
+str(Telefonia_2019)
+
+```
+ * Detalle de las variables:
+
+|Nombre   |	Tipo	   |  Descripción                                           |
+|---------|----------|--------------------------------------------------------|
+|id       |	         |	Identificación                                        |
+|retenc   |	Continua |	Meses dentro del servicio                             |
+|edad     |	Continua |	Edad del cliente que contrató el servicio             |
+|ingresos |	Continua |	Ingresos del grupo familiar en el último mes en miles |
+|educ     |	Ordinal  |	Máximo nivel educativo alcanzado                      |
+|empleo   |	Continua |	Años en el actual empleo                              |
+|personas |	Discreta |	Cantidad de personas en el hogar                      |
+|gastoIN  |	Continua |	Consumo internacional último mes                      |
+|gastoNac |	Continua |	Consumo larga distancia nacional último mes           |
+|internet |	Nominal  |	Si contrató el paquete con servicio de Internet       |
+
+Codificación Educación:
+
+| # |  Descripción            |
+|---|-------------------------|
+|1	|Secundario incompleto    |
+|2	|Secundario completo      |
+|3	|Terciario/universitario  |
+|4	|Posgrado                 |
+	
+Codificación Internet:
+
+| # |  Descripción |
+|---|--------------|
+|0	| No           |
+
+Observamos que los tipos de variables en R no corresponen con el enunciado del problema, deberan ser cambiadas antes de usarlas.
+
+ * Realizamos BoxPlot de las variables continuas:
+
+```{r}
+
+plot_1 <- ggplot(Telefonia_2019,aes(y=ingresos))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_2 <- ggplot(Telefonia_2019,aes(y=retenc))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_3 <- ggplot(Telefonia_2019,aes(y=edad))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_4 <- ggplot(Telefonia_2019,aes(y=empleo))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_5 <- ggplot(Telefonia_2019,aes(y=gastoNac))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+plot_6 <- ggplot(Telefonia_2019,aes(y=gastoIN))+geom_boxplot()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+gridExtra::grid.arrange(plot_1, plot_2, plot_3, plot_4, plot_5, plot_6, 
+                        ncol=2, nrow=3)
+
+```
+Podemos observar que algunas variables tienen valores atípicos, esto puede traer problema para la regresión. También observamos que las distribuciones no parecen ser normales. 
+
+ * Realizamos tablas de frecuencia de las variables no continuas:
+
+```{r}
+kable(table(Telefonia_2019$internet), caption = "Tabla de Frecuencia - Internet") %>%
+  kable_styling(latex_options =c("hold_position"))
+
+kable(table(Telefonia_2019$educ), caption = "Tabla de Frecuencia - Educación") %>%
+  kable_styling(latex_options =c("hold_position"))
+
+kable(table(Telefonia_2019$personas), caption = "Tabla de Frecuencia - Personas") %>%
+  kable_styling(latex_options =c("hold_position"))
+
+```
+
+Podemos observar que los datos son todos correctos, no poseemos datos nulos.
+
+ * Correlación entre las variables:
+
+```{r}
+kable(round(cor(x=Telefonia_2019[-1], method = "pearson"), 3), caption = "Matriz de Correlación") %>%   kable_styling(latex_options =c("hold_position"))
+```
+
+Realizamos una gráfica tipo Pairs, que muestra la correlación y las gráficas de dispersión entre variables.
+
+
+```{r message=FALSE}
+ggpairs(Telefonia_2019[,-1])
+```
+De las gráficas se observa que podría haber una relación lineal entre los pares de variables ingresos-gastoNac y empleo-gastoIN. Además su valor de correlación son los mas altos.
+
+ * Hacemos un test para probar si hay correlación lineal entre las variables
+ 
+```{r}
+cor.test(x = Telefonia_2019$empleo,   y = Telefonia_2019$ingresos, method = "pearson")
+cor.test(x = Telefonia_2019$gastoNac, y = Telefonia_2019$ingresos, method = "pearson")
+```
+ 
+ En los dos casos obtenemos un p-valor (< 2.2e-16) menor a 0.05, tendría sentido intentar generar un modelo de regresión lineal con alguna de estas variables.
+
+### 2.	Desarrolle un modelo de regresión que relacione el ingreso del grupo familiar con la variable continua que esté más correlacionada con esta.
+
+Del análisis del punto anterior podemos ver que la variable más correlacionada con ingresos es gastoNac, 0.739.
+
+```{r}
+
+modelo_gastoNac <- lm(ingresos~gastoNac,data = Telefonia_2019)
+summary(modelo_gastoNac)
+
+```
+
+En la salida podemos ver lo siguiente:
+
+ - El valor estimado para los dos parámetros de la ecuación del modelo lineal (Beta0 y Beta1) que equivalen a la ordenada en el origen y la pendiente (Columna "Estimate").
+
+ - Para el modelo generado, tanto la ordenada en el origen como la pendiente son significativas  (p-values < 0.05), tienen importancia en el modelo.
+ 
+ - El valor de R2 indica que el modelo calculado explica el 54.66% de la variabilidad presente en la variable respuesta (ingresos) mediante la variable independiente (gastoNac).
+ 
+ - El p-value obtenido en el test F (< 2.2e-16) determinaría que el modelo es significativo y por lo tanto se podría aceptar si se cumplen con los supuestos de la regrasión lineal. 
+
+
+Solo para comparar, volvemos a generar el modelo sin el intercepto.
+
+```{r}
+modelo_gastoNac2 <- lm(ingresos~gastoNac-1,data = Telefonia_2019)
+summary(modelo_gastoNac2)
+```
+
+Metricas de comparación de modelos:
+
+```{r}
+
+glance(modelo_gastoNac) %>%
+  dplyr::select(adj.r.squared, sigma, AIC, BIC, p.value)
+
+```
+
+```{r}
+glance(modelo_gastoNac2) %>%
+  dplyr::select(adj.r.squared, sigma, AIC, BIC, p.value)
+
+```
+
+Teniendo en cuenta las métricas consideradas anterior el *adj.r.squared* mejora quitando el intercepto, por lo tanto se explica mejor el la variación de la salida con respecto a la variable predictora ajustada al nro de variables. Sin embargo las métricas raiz cuadrada de varianza en los residuos ($\sigma$) como los criterios de informacion tanto de Akaike como Bayesiano (AIC, BIC) empeoran. 
+
+
+#### a.	¿Cuál es la ecuación resultante?
+
+Ecuación resultante del primer modelo con el intercepto.
+
+$$
+ingresos = `r modelo_gastoNac$coefficients[1]` + `r modelo_gastoNac$coefficients[2]` * gastoNac
+$$
+
+Podemos decir que en promedio, cada incremento en una unidad de gastoNac, corresponde a un incremento de 2.78 del ingreso.
+
+#### b.	Diseñe un gráfico que incluya la recta y el intervalo de confianza del 95% para la media (con línea punteada o similar). 
+
+
+```{r message=FALSE}
+Telefonia_2019 %>%
+  ggplot(aes(x=gastoNac, y=ingresos)) +
+  geom_point() +
+  geom_smooth(method='lm')
+```
+
+En el grafico podemos ver un punto aislado, más remoto en las x. Esto puede afectar el ajuste por mínimos cuadrados al generar el modelo 
+
+Realizamos una gráfica agregando el intervalo de predicción.
+
+
+```{r}
+#I confianza para la media y de predicción para la respuesta
+res.pred1 <- predict(modelo_gastoNac,
+                      list(gastoNac= c(0:95)),
+                      interval="confidence")
+res.pred2 <- predict(modelo_gastoNac,
+                      list(gastoNac= c(0:95)),
+                      interval="prediction")
+#Graficando bandas de confianza y bandas de predicción
+par(mfrow=c(1,1))
+plot(ingresos~gastoNac, data=Telefonia_2019, xlim=c(0,100),
+     ylim=c(5,370), pch=10)
+abline(modelo_gastoNac,col="blue")
+lines(c(0:95), res.pred1[, 2], lty = 2)
+lines(c(0:95), res.pred1[, 3], lty = 2)
+lines(c(0:95), res.pred2[, 2], lty = 2, col = "red")
+lines(c(0:95), res.pred2[, 3], lty = 2, col = "red")
+```
+
+Se puede observar, como indica la teoria, que el intervalo de predición es más ancho que el intervalo de confianza de la media, y que incluye a l mayoría de la observaciones dentro del intervalo.
+
+### 3.	Desarrolle ahora un modelo de regresión que relacione la variable ingreso con todas las variables continuas y también la de cantidad de personas en el hogar.
+
+Generamos dos modelos, uno tomando la variable personas como factor (varible dummie) y otro tomando la variable como continua.
+
+```{r}
+
+modelo_3 = lm( ingresos ~ retenc + edad + empleo + factor(personas)
+                      + gastoNac + gastoIN, data = Telefonia_2019)
+summary(modelo_3)
+
+```
+```{r}
+modelo_3_2 = lm( ingresos ~ retenc + edad + empleo + personas
+                      + gastoNac + gastoIN, data = Telefonia_2019)
+summary(modelo_3_2)
+```
+
+#### a.	¿Es el modelo significativo?
+
+Podemos observar que ambos modelos tiene un R2 mayora 0.65, y los p-valor obtenidos en el test F (< 2.2e-16) determinarían que los modelos son significativos y por lo tanto se podría aceptar si se cumplen con los supuestos de la regrasión lineal. 
+
+Podemos ver por los p-valor que las variables empleo y gastosNac son las más significativas. Tienen p-valor menor a 0.05.
+
+Hacemos tambien una prueba de significancia de la regresión con ANOVA.
+
+```{r}
+anova(modelo_3)
+anova(modelo_3_2)
+```
+
+En cuatro variables obtuvimos un valor grande de F, y un p-valor muy chico(< 2e-16) indicando que la regresión es significativa. Solo nos falta validar los supuestos.
+
+#### b.	¿Qué variables son significativas al 5%?
+
+Filtramos las Variables con p-valor menor a 0.05:
+
+```{r}
+kable(summary(modelo_3)$coefficients[
+  which(summary(modelo_3)$coefficients[,4]<0.05),4], 
+  col.names = "p-valor", digits = 16)
+
+```
+Observamos también si los intervalos de confianza de los coeficients contienen al 0.
+
+```{r}
+confint(modelo_3_2)
+```
+
+Observamos que las dos variables que no incluyen al cero en su intervalo de confianza son empleo y gastoNac, las mismas que filtramos por p-valor.
+
+#### c.	¿Cómo compara el impacto de las variables en el modelo? ¿Cuál es la variable 'más importante' en el modelo? ¿Y la 'menos importante'?
+
+Podemos comparar el impacto de las variables por su significancia, observando el p-valor, por el peso de su coeficiente beta, y observando si el intervalo de confianza el coeficiente beta incluye al cero como se ve en el punto anterior.
+
+ * Variable menos importante:
+
+```{r}
+which.max(summary(modelo_3)$coefficients[,4])
+summary(modelo_3)$coefficients[which.max(summary(modelo_3)$coefficients[,4]),4]
+
+which.max(summary(modelo_3_2)$coefficients[,4])
+summary(modelo_3_2)$coefficients[which.max(summary(modelo_3_2)$coefficients[,4]),4]
+```
+
+La variable con el p-valor más grande es $factor(personas)1$, o $personas$ si tomamos el modelo sin factor.
+
+#### d.	Verifique los supuestos necesarios.
+
+ * Relación lineal entre variable dependiente e independiente:
+ 
+Se calculan los residuos para cada observación y se grafican. 
+
+```{r}
+Telefonia_2019$prediccion <- modelo_3_2$fitted.values
+Telefonia_2019$residuos   <- modelo_3_2$residuals
+
+ggplot(data = Telefonia_2019, aes(x = prediccion, y = residuos)) +
+  geom_point(aes(color = residuos)) +
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") +
+  geom_hline(yintercept = 0) +
+  geom_segment(aes(xend = prediccion, yend = 0), alpha = 0.2) +
+  labs(title = "Distribución de los residuos", x = "predicción modelo",
+       y = "residuo") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+```
+
+
+Los residuos no ven distribuidos aleatoriamente entorno al valor 0, por lo que no se acepta la linealidad. 
+
+* Distribución normal de los residuos:
+
+```{r}
+## Grafica qqplot para analizar normalidad: 
+qqnorm(modelo_3$residuals)
+qqline(modelo_3$residuals)
+
+## Teste de Shapiro para normalidad
+shapiro.test(modelo_3$residuals)
+```
+De la gráfica qqplot podemos observar que los puntos no están todos bien cercanos a la linea, esto indica que no se cumple el supuesto de normalidad.
+Verificamos lo que observamos en la gráfica con el test de Shapiro, concluimos que no se cumple el supuesto de normalidad.
+
+* Supuesto de homocedasticidad (Variabilidad constante de los residuos):
+
+Representamos los residuos frente a los valores ajustados por el modelo.
+
+```{r}
+ggplot(data = Telefonia_2019, aes(modelo_3$fitted.values, modelo_3$residuals)) +
+  geom_point() +
+  geom_smooth(color = "firebrick", se = FALSE) +
+  geom_hline(yintercept = 0) +
+  theme_bw()
+```
+
+No se ve una distribución aleatoria de los puntos, hay mayor concentración de puntos a la izquierda. Por esto suponemos que no hay homocedasticidad.
+
+Realizamos el test de Breusch-Pagan para verificar lo observado en la gráfica anterior.
+
+```{r}
+bptest(modelo_3)
+```
+Se rechaza H0, concluimos que no hay homocedasticidad.
+
+ * Autocorrelación de residuos: 
+  
+Se observa si hay patrones en la distribución de los residuos.
+
+```{r}
+
+ggplot(data = Telefonia_2019, aes(x = seq_along(residuos), y = residuos)) +
+  geom_point(aes(color = residuos)) +
+  scale_color_gradient2(low = "blue3", mid = "grey", high = "red") +
+  geom_line(size = 0.3) +
+  labs(title = "Distribución de los residuos", x = "index", y = "residuo") +
+  geom_hline(yintercept = 0) +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5), legend.position = "none")
+
+```
+
+Solo se observa una pequeña tendencia a ser mayores a la izquierda del gráfico.
+
+Procedemos ahora a tratar de buscar indicios de multicolinealidad, para lo cual utilizaremos la métrica Variance Inflation Factor (VIf):
+
+```{r}
+car::vif(modelo_3)
+```
+En este caso solo empleo tiene un valor mayor a 5 y puede significar que dicha variable puede expresarse como combinación lineal de las otras. De todas maneras, el inidicio fuerte estaría dado con un valor superior a 10. Podríamos proceder a quitar esta variable y reevaluar el modelo
+
+
+
+
+Sabiendo que no se verifican los supuestos, concluimos que los modelos obtenidos no son significativos.
+
+#### e.	¿Cómo interpreta el coeficiente de la variable “personas”? es significativa esta variable en el modelo?
+
+La variable tiene un p-valor alto que india que no es siginificativa para el modelo. Tmabién observamos que el intervalo de confianza del coeficiente incluía al cero, esto nos muestra que la varible no influye de forma significativa en el modelo.
+
+Por el coeficiente obtenido, 0.48333, podemos decir que en promedio por cada incremento de una unidad en la varible personas se corresponde en un incremento de 0.48333 del ingreso si todas las otras variables permanecen constantes.
+
+### 4.	Proponga ahora un modelo de regresión seleccionando las variables con backward y forward. ¿Conducen al mismo modelo ambos métodos?
+
+ * Selección con forward
+
+```{r}
+forwRM <- regsubsets( ingresos ~ retenc + edad + empleo + personas
+                      + gastoNac + gastoIN, data = Telefonia_2019, method="forward", nvmax = 6)
+summary(forwRM)
+```
+
+Hacemos un grafico comparativo de los modelos generados con forward.
+
+```{r}
+p <- ggplot(data = data.frame(n_predictores = 1:6,
+                              R_ajustado = summary(forwRM)$adjr2),
+            aes(x = n_predictores, y = R_ajustado)) +
+    geom_line() +
+    geom_point()
+
+#Se identifica en rojo el máximo
+p <- p + geom_point(aes(
+                    x = n_predictores[which.max(summary(forwRM)$adjr2)],
+                    y = R_ajustado[which.max(summary(forwRM)$adjr2)]),
+                    colour = "red", size = 3)
+p <- p +  scale_x_continuous(breaks = c(0:6)) + 
+          theme_bw() +
+          labs(title = 'R2_ajustado vs número de predictores', 
+               x =  'número predictores')
+p
+```
+
+Seleccionando el modelo por R2, obtenemos un modelo con 5 variables. Se puede ver en la salida del summary anterior cuales son las primeras 5 (gastoNac, empleo, edad, gastoIN y retenc)
+
+ * Selección con backward
+
+```{r}
+backRM <- regsubsets( ingresos ~ retenc + edad + empleo + personas
+                      + gastoNac + gastoIN, data = Telefonia_2019, method="backward", nvmax = 6)
+summary(backRM)
+```
+
+Hacemos un grafico comparativo de los modelos generados con backward.
+
+```{r}
+p <- ggplot(data = data.frame(n_predictores = 1:6,
+                              R_ajustado = summary(backRM)$adjr2),
+            aes(x = n_predictores, y = R_ajustado)) +
+    geom_line() +
+    geom_point()
+
+#Se identifica en rojo el máximo
+p <- p + geom_point(aes(
+                    x = n_predictores[which.max(summary(backRM)$adjr2)],
+                    y = R_ajustado[which.max(summary(backRM)$adjr2)]),
+                    colour = "red", size = 3)
+p <- p +  scale_x_continuous(breaks = c(0:6)) + 
+          theme_bw() +
+          labs(title = 'R2_ajustado vs número de predictores', 
+               x =  'número predictores')
+p
+```
+
+Seleccionando el modelo por R2, obtenemos un modelo con 5 variables. Se puede ver en la salida del summary anterior cuales son las primeras 5 (gastoNac, empleo, gastoIN, retenc y edad).
+
+Los modelos generados con backward y forward nos dieron igules pero en diferentes orden. Estos son los dos valores de R2 obtenidos.
+
+```{r}
+# R2 en Forward
+summary(forwRM)$adjr2[5]
+# R2 en Backward
+summary(backRM)$adjr2[5]
+
+```
+
+
+### 5.	Ajuste ahora un modelo tomando en cuenta las variables regresoras elegidas en el ítem anterior, más la variable Internet agregada adecuadamente. 
+
+```{r}
+modelo_5 <- lm(formula = ingresos ~ gastoNac + empleo + gastoIN +  retenc + edad + 
+                 factor(internet), data = Telefonia_2019)
+summary(modelo_5)
+
+```
+
+Vemos en este caso que la mayoría de las variables son significativas y las que no lo son tienen p-valor no tan alejados del 0.05.
+
+### 6.	Finalmente, compare adecuadamente todos los modelos ajustados y elija el modelo ganador.
+
+La comparación de modelos puede hacerce desde dos perspectivas, uno por el poder *explicativo* de los modelos y otras por el poder *predictivo*, en cada caso, un conjunto específico de métricas deben seleccionarse.
+
+#### Poder explicativo
+
+Comparación por R2:
+
+```{r}
+glance(modelo_3) %>%
+  dplyr::select(adj.r.squared, sigma, AIC, BIC, p.value)
+```
+```{r}
+glance(modelo_5) %>%
+  dplyr::select(adj.r.squared, sigma, AIC, BIC, p.value)
+
+```
+
+Elegimos el modelo_5 como mejor modelo por tener un R2 mayor y un AIC menor.
+
+#### Poder predictivo
+
+```{r}
+MSE(Telefonia_2019$ingresos, predict(modelo_3,Telefonia_2019 ))
+```
+```{r}
+MSE(Telefonia_2019$ingresos, predict(modelo_5,Telefonia_2019 ))
+```
+En este caso la diferencia es muy pequeña en favor al modelo_3, de todas formas es conveniente evaluar poder predictivo en un dataset de validación que no ha sido utilizado en entrenamiento o con técnicas más avanzadas como cross validation.
+
+
+
+

@@ -7,11 +7,11 @@ library(extrafont)
 library(scales)
 library(lubridate)
 
-font_import()
+#font_import()
 
 # --------------------------------------Cargar datos------------------------------------
 
-datos <- read_excel("./data/Gaby-presion-JULIO 2020.xlsx")
+datos <- read_excel("./data/Gaby-presion.xlsx")
 View(datos)
 names(datos) <- gsub("á", "a", tolower(names(datos)))
 names(datos) <- gsub("í", "i", tolower(names(datos)))
