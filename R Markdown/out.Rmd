@@ -3,6 +3,7 @@ title: "Regresión Logística Múltiple"
 author: "Tomás Sánchez Grigioni"
 date: "6/9/2020"
 output:
+  word_document: default
   html_document:
     df_print: paged
 ---
@@ -420,6 +421,7 @@ rm(puntos_influyentes)
 ```
 
 De vuelta observamos que todos los puntos tienen una distancia de cook menor a 1. Como no hay observaciones que se encuentren más alejadas que el resto seguimos con el analizis.
+
 Ahora buscamos un punto de corte que optimice la sensitividad y la especificidad.
 
 ```{r}
@@ -483,20 +485,31 @@ roc1 <- roc(datos_it2$sobrevivio, modelo_it1$fitted.values)
 roc2 <- roc(datos_it3$sobrevivio, modelo_it2$fitted.values)
 roc3 <- roc(datos_it3$sobrevivio, modelo_it3$fitted.values)
 
-par(pty = "s")
-roc(datos_it2$sobrevivio, modelo_it0$fitted.values, legacy.axes = TRUE, plot = TRUE,
-            percent = TRUE, col = "#fec44f", print.auc = TRUE, lwd = 2)
-plot.roc(datos_it2$sobrevivio, modelo_it1$fitted.values, legacy.axes = TRUE, percent = TRUE, 
-         col = "#2b8cbe", print.auc = TRUE, lwd = 2, add = TRUE, print.auc.y = 40)
-plot.roc(datos_it3$sobrevivio, modelo_it2$fitted.values, legacy.axes = TRUE, percent = TRUE,
-         col = "#31a354", print.auc = TRUE, lwd = 2, add = TRUE, print.auc.y = 30)
-plot.roc(datos_it3$sobrevivio, modelo_it3$fitted.values, legacy.axes = TRUE, percent = TRUE, 
-         col = "#756bb1", print.auc = TRUE, lwd = 2, add = TRUE, print.auc.y = 20)
-par(xpd = TRUE)
-legend(-3, 50, legend = c("Modelo 0", "Modelo 1", "Modelo 2", "Modelo 3"), 
-       col = c("#fec44f", "#2b8cbe", "#31a354", "#756bb1"), lwd = 2)
-par(pty = "m")
 
+df_grafico <- data.frame(Sensibilidad = roc0$sensitivities,
+                         Especificidad = roc0$specificities,
+                         Modelo = "Modelo 0")
+
+df_grafico <- df_grafico %>% 
+  add_row(Sensibilidad = roc1$sensitivities, Especificidad = roc1$specificities, Modelo = "Modelo 1") %>% 
+  add_row(Sensibilidad = roc2$sensitivities, Especificidad = roc2$specificities, Modelo = "Modelo 2") %>% 
+  add_row(Sensibilidad = roc3$sensitivities, Especificidad = roc3$specificities, Modelo = "Modelo 3")
+
+df_auc <- data.frame(AUC = as.numeric(auc(roc0)), Modelo = "Modelo 0", x = .75, y = .5) %>% 
+  add_row(AUC = as.numeric(auc(roc1)), Modelo = "Modelo 1", x = .75, y = .4) %>% 
+  add_row(AUC = as.numeric(auc(roc2)), Modelo = "Modelo 2", x = .75, y = .3) %>% 
+  add_row(AUC = as.numeric(auc(roc3)), Modelo = "Modelo 3", x = .75, y = .2)
+
+ggplot(df_grafico, aes(1 - Especificidad, Sensibilidad, color = Modelo)) +
+  geom_line(size = 1.2) +
+  geom_text(data = df_auc, aes(x = x, y = y, label = paste("AUC =", round(AUC, 3)), color = Modelo), show.legend =  FALSE) +
+  geom_segment(xend = 1, yend = 1, x = 0, y = 0, size = 1, color = "gray", linetype = "dashed") +
+  ggtitle("Curvas ROC") +
+  scale_x_continuous(labels = label_percent()) +
+  scale_y_continuous(labels = label_percent()) 
+
+
+rm(df_grafico, roc0, roc1, roc2, roc3)
 ```
 
 Los gráficos de las distintas curvas ROC no se logran diferenciar porque se superponene. Indicando que todos los modelos tienen una capacidad predictiva similar.
@@ -506,10 +519,9 @@ Por último, mostramos los valores comparativos entre todos los modelos explorad
 ```{r}
 
 tabla_resumen_modelos <- tabla_resumen_modelos %>% 
-  mutate(AUC = c(auc(roc0), auc(roc1), auc(roc2), auc(roc3)))
+  mutate(AUC = df_auc$AUC)
 
 kable(tabla_resumen_modelos)
 
-rm(roc0, roc1, roc2, roc3, tabla_resumen_modelos)
+rm(df_auc, tabla_resumen_modelos)
 ```
-
