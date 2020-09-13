@@ -28,8 +28,8 @@ hacer_barplot_con_dos_cuantitativas <- function(datos, var1, var2, min = 0, max 
 }
 
 
-obtener_resultados_todos_posibles_valores_criticos<- function(valores_reales, 
-                                                              probabilidades_estimadas, 
+obtener_resultados_todos_posibles_valores_criticos<- function(valores_reales,
+                                                              probabilidades_estimadas,
                                                               signo_negativo = 0, 
                                                               signo_positivo = 1,
                                                               separacion = .01) {

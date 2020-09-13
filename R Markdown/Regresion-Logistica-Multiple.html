@@ -2256,16 +2256,16 @@ summary {
 <col width="11%"></col>
 <col width="7%"></col>
 <col width="7%"></col>
-<col width="64%"></col>
 <col width="10%"></col>
+<col width="64%"></col>
 </colgroup>
 <thead>
 <tr class="header">
 <th align="left">Modelo</th>
 <th align="right">AIC</th>
 <th align="right">R2</th>
-<th align="left">Observacion</th>
 <th align="right">AUC</th>
+<th align="left">Observacion</th>
 </tr>
 </thead>
 <tbody>
@@ -2273,32 +2273,129 @@ summary {
 <td align="left">modelo_it0</td>
 <td align="right">659.23</td>
 <td align="right">0.3289</td>
-<td align="left">Todas las variables</td>
 <td align="right">0.8521592</td>
+<td align="left">Todas las variables</td>
 </tr>
 <tr class="even">
 <td align="left">modelo_it1</td>
 <td align="right">657.58</td>
 <td align="right">0.3289</td>
-<td align="left">Se excluye a precio_ticket</td>
 <td align="right">0.8523219</td>
+<td align="left">Se excluye a precio_ticket</td>
 </tr>
 <tr class="odd">
 <td align="left">modelo_it2</td>
 <td align="right">651.57</td>
 <td align="right">0.3362</td>
-<td align="left">Se excluye a observación 241 y se presentan todas las variables</td>
 <td align="right">0.8541738</td>
+<td align="left">Se excluye a observación 241 y se presentan todas las variables</td>
 </tr>
 <tr class="even">
 <td align="left">modelo_it3</td>
 <td align="right">649.68</td>
 <td align="right">0.3361</td>
-<td align="left">Se excluye a observación 241 y a precio_ticket</td>
 <td align="right">0.8543531</td>
+<td align="left">Se excluye a observación 241 y a precio_ticket</td>
 </tr>
 </tbody>
 </table>
+</div>
+<div id="extra" class="section level2">
+<h2>Extra</h2>
+<p>Al principio del análisis descubrimos que existia en un outlier en la variable <strong>precio_ticket</strong> que se encontraba excesivamente separada del resto de observaciones. Durante el desarrollo esta misma variable no resulto significativa para el modelo de regresión múltiple. Lo que vamos a hacer es analizar si exluyendo dicha observación, esta variable se vuelve significativa.</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["sobrevivio"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["clase"],"name":[2],"type":["fctr"],"align":["left"]},{"label":["sexo"],"name":[3],"type":["fctr"],"align":["left"]},{"label":["edad"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["her_esp"],"name":[5],"type":["int"],"align":["right"]},{"label":["padre_hijo"],"name":[6],"type":["int"],"align":["right"]},{"label":["ticket"],"name":[7],"type":["fctr"],"align":["left"]},{"label":["precio_ticket"],"name":[8],"type":["dbl"],"align":["right"]},{"label":["nro_cabina"],"name":[9],"type":["fctr"],"align":["left"]},{"label":["puerto_embarcacion"],"name":[10],"type":["fctr"],"align":["left"]}],"data":[{"1":"1","2":"1ra","3":"Mujer","4":"35","5":"0","6":"0","7":"PC 17755","8":"512.3292","9":"","10":"C","_rn_":"209"},{"1":"1","2":"1ra","3":"Hombre","4":"36","5":"0","6":"1","7":"PC 17755","8":"512.3292","9":"B51 B53 B55","10":"C","_rn_":"538"},{"1":"1","2":"1ra","3":"Hombre","4":"35","5":"0","6":"0","7":"PC 17755","8":"512.3292","9":"B101","10":"C","_rn_":"588"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Nos damos cuenta que no era solo una observación sino que eran tres. Sacamos estas observaciones y volvemos a realizar un modelo</p>
+<p>Planteamos un modelo inicial con todas las variables</p>
+<pre><code>## 
+## Call:
+## glm(formula = sobrevivio ~ clase + sexo + edad + precio_ticket, 
+##     family = &quot;binomial&quot;, data = datos_it4)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -2.6369  -0.6690  -0.3924   0.6454   2.4798  
+## 
+## Coefficients:
+##                Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)    1.554939   0.459169   3.386 0.000708 ***
+## clase2da      -1.498787   0.335215  -4.471 7.78e-06 ***
+## clase3ra      -2.814345   0.359749  -7.823 5.15e-15 ***
+## sexoMujer      2.575248   0.211365  12.184  &lt; 2e-16 ***
+## edad          -0.038573   0.007831  -4.926 8.41e-07 ***
+## precio_ticket -0.004011   0.003166  -1.267 0.205220    
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 959.09  on 710  degrees of freedom
+## Residual deviance: 642.62  on 705  degrees of freedom
+## AIC: 654.62
+## 
+## Number of Fisher Scoring iterations: 5</code></pre>
+<p>Seleccionamos las variables con la técnica de stepwise</p>
+<pre><code>## Start:  AIC=654.62
+## sobrevivio ~ clase + sexo + edad + precio_ticket
+## 
+##                 Df Deviance    AIC
+## - precio_ticket  1   644.19 654.19
+## &lt;none&gt;               642.62 654.62
+## - edad           1   668.84 678.84
+## - clase          2   716.03 724.03
+## - sexo           1   823.64 833.64
+## 
+## Step:  AIC=654.19
+## sobrevivio ~ clase + sexo + edad
+## 
+##                 Df Deviance    AIC
+## &lt;none&gt;               644.19 654.19
+## + precio_ticket  1   642.62 654.62
+## - edad           1   668.92 676.92
+## - clase          2   742.91 748.91
+## - sexo           1   824.95 832.95</code></pre>
+<pre><code>## 
+## Call:  glm(formula = sobrevivio ~ clase + sexo + edad, family = &quot;binomial&quot;, 
+##     data = datos_it4)
+## 
+## Coefficients:
+## (Intercept)     clase2da     clase3ra    sexoMujer         edad  
+##     1.20250     -1.26953     -2.53917      2.52951     -0.03668  
+## 
+## Degrees of Freedom: 710 Total (i.e. Null);  706 Residual
+## Null Deviance:       959.1 
+## Residual Deviance: 644.2     AIC: 654.2</code></pre>
+<p>Realizamos un nuevo modelo</p>
+<pre><code>## 
+## Call:
+## glm(formula = sobrevivio ~ clase + sexo + edad, family = &quot;binomial&quot;, 
+##     data = datos_it4)
+## 
+## Deviance Residuals: 
+##     Min       1Q   Median       3Q      Max  
+## -2.7144  -0.6765  -0.3952   0.6449   2.4644  
+## 
+## Coefficients:
+##              Estimate Std. Error z value Pr(&gt;|z|)    
+## (Intercept)  1.202495   0.360541   3.335 0.000852 ***
+## clase2da    -1.269526   0.278839  -4.553 5.29e-06 ***
+## clase3ra    -2.539173   0.281956  -9.006  &lt; 2e-16 ***
+## sexoMujer    2.529507   0.207347  12.199  &lt; 2e-16 ***
+## edad        -0.036684   0.007652  -4.794 1.64e-06 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## (Dispersion parameter for binomial family taken to be 1)
+## 
+##     Null deviance: 959.09  on 710  degrees of freedom
+## Residual deviance: 644.19  on 706  degrees of freedom
+## AIC: 654.19
+## 
+## Number of Fisher Scoring iterations: 5</code></pre>
+<p>Como se observa se llega a un modelo similar al planteado en el análisis previo.</p>
 </div>
 
 

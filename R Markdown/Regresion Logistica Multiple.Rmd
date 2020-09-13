@@ -2,10 +2,9 @@
 title: "Regresión Logística Múltiple"
 author: "Tomás Sánchez Grigioni"
 date: "6/9/2020"
-output:
-  word_document: default
+output: 
   html_document:
-    df_print: paged
+      df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -521,7 +520,50 @@ Por último, mostramos los valores comparativos entre todos los modelos explorad
 tabla_resumen_modelos <- tabla_resumen_modelos %>% 
   mutate(AUC = df_auc$AUC)
 
+tabla_resumen_modelos <- tabla_resumen_modelos[,c("Modelo", "AIC", "R2", "AUC", "Observacion")]
+
 kable(tabla_resumen_modelos)
 
 rm(df_auc, tabla_resumen_modelos)
 ```
+
+## Extra
+
+Al principio del análisis descubrimos que existia en un outlier en la variable **precio_ticket** que se encontraba excesivamente separada del resto de observaciones. Durante el desarrollo esta misma variable no resulto significativa para el modelo de regresión múltiple. Lo que vamos a hacer es analizar si exluyendo dicha observación, esta variable se vuelve significativa.
+
+```{r}
+# Trabajamos con datos_it2 porque es la que contiene todas las observaciones excepto por los NAs
+indice <- which(datos_it2$precio_ticket > 500)
+datos_it2[indice,]
+```
+
+Nos damos cuenta que no era solo una observación sino que eran tres. Sacamos estas observaciones y volvemos a realizar un modelo
+
+```{r}
+datos_it4 <- datos_it2[-indice,]
+rm(indice)
+```
+
+Planteamos un modelo inicial con todas las variables 
+
+```{r}
+modelo_it4 <- glm(sobrevivio ~ clase + sexo + edad + precio_ticket, 
+                  data = datos_it4,family = "binomial")
+summary(modelo_it4)
+```
+
+Seleccionamos las variables con la técnica de stepwise
+
+```{r}
+step(modelo_it4, direction = "both")
+```
+
+Realizamos un nuevo modelo 
+
+```{r}
+modelo_it5 <- glm(formula = sobrevivio ~ clase + sexo + edad, family = "binomial", 
+    data = datos_it4)
+summary(modelo_it5)
+```
+
+Como se observa se llega a un modelo similar al planteado en el análisis previo.
